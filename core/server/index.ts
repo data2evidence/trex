@@ -1,7 +1,9 @@
 //import { runScript } from 'https://cdn.jsdelivr.net/npm/bebo@0.0.6/lib/bebo_core.js'
 //await runScript("./src/main.cljs");
 // @ts-ignore
-import { Hono } from "jsr:@hono/hono";
+import { Hono, adapter } from "jsr:@hono/hono";
+import { serveStatic } from "jsr:@hono/hono/deno";
+
 import { STATUS_CODE } from 'https://deno.land/std/http/status.ts';
 
 
@@ -63,7 +65,7 @@ async function _callWorker (req: any, servicePath: string) {
 };
 
 function _addFunction(url, path) {
-	app.all(url, (c) => _callWorker(c.req.raw, `${BASE_PATH}${path}`));
+	app.all(url, (c) => _callWorker(c.req.raw, `${path}`));
 }
 
 function _callService(c,x) {
@@ -74,20 +76,47 @@ function _addService(url, service) {
 	app.all(url, (c) => _callService(c, service));
 }
 
-async function  addRoutes() {
-	const pkg = JSON.parse(await Deno.readTextFile(`${BASE_PATH}/package.json`));
-	if(pkg.trex.routes)
-		pkg.trex.routes.forEach(r => {
-		if(r.function) {
-			_addFunction(r.source, r.function);
-		} else if (r.service) {
-			_addService(r.source, r.servce);
-		} else {
-			console.error("unknown route type");
-		}
-	});
-		
+function _addStatic(url, path) {
+	console.log("🦖 "+url + "   " + path);
+	app.use(url+"/*", serveStatic({root: path, rewriteRequestPath: (path) =>
+		path.replace(new RegExp(`^${url}`), '') }));
 }
 
-addRoutes();
+async function  _addPlugin(dir) {
+	const pkg = JSON.parse(await Deno.readTextFile(`${dir}/package.json`));
+	switch(pkg.trex.type) {
+		case "functions":
+			if(pkg.trex.routes)
+				pkg.trex.routes.forEach(r => {
+				if(r.function) {
+					//console.log(`add fun ${r.source}`)
+					_addFunction(r.source, `${dir}${r.function}`);
+				} else if (r.service) {
+					//console.log(`add svc ${r.source}`)
+					_addService(r.source, `${dir}${r.servce}`);
+				} else {
+					console.error("🦖 unknown route type");
+				}
+			});
+			break;
+		case "ui":
+			if(pkg.trex.routes)
+				pkg.trex.routes.forEach(r => {
+					_addStatic(`${r.source}`, `${dir}${r.target}/`);
+			});
+			break;
+		default:
+			console.log(`🦖 Unknown type: ${pkg.trex.type}`);
+	}
+}
+
+async function addPlugins() {
+	for await (const plugin of Deno.readDir(`${BASE_PATH}`)) {
+		if(plugin.isDirectory)
+			_addPlugin(`${BASE_PATH}/${plugin.name}`);
+	}
+}
+
+app.use("/*", async (c, n) => {console.log(`🦖 REQEST ${c.req.url}`); await n(); });
+addPlugins();
 Deno.serve(app.fetch);
