@@ -14,6 +14,8 @@ use futures::FutureExt;
 use log::error;
 use serde::Serialize;
 use tokio::sync::oneshot;
+use std::process::Command;
+
 
 mod upgrade;
 
@@ -318,6 +320,16 @@ fn op_runtime_memory_usage(scope: &mut v8::HandleScope) -> MemoryUsage {
     }
 }
 
+#[op2(fast)]
+fn op_run_cmd() {
+    let output = Command::new("ls")
+        .output()
+        .expect("failed to execute process");
+
+     println!("stdout: {}", String::from_utf8_lossy(&output.stdout));
+
+}
+
 #[op2]
 #[string]
 pub fn op_read_line_prompt(
@@ -357,6 +369,7 @@ deno_core::extension!(
         op_read_line_prompt,
         op_set_exit_code,
         op_runtime_metrics,
+        op_run_cmd,
         op_schedule_mem_check,
         op_runtime_memory_usage,
         op_set_raw,

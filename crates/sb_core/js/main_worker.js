@@ -11,6 +11,7 @@ Object.defineProperty(globalThis, 'EdgeRuntime', {
 			getRuntimeMetrics: () => /* async */ ops.op_runtime_metrics(),
 			applySupabaseTag: (src, dest) => applySupabaseTag(src, dest),
 			systemMemoryInfo: () => ops.op_system_memory_info(),
+			execCmd: /* async */ () => ops.op_run_cmd()
 		};
 	},
 	configurable: true,
