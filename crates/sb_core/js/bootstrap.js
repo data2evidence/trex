@@ -405,6 +405,7 @@ const PATCH_DENO_API_LIST = {
 	'readFileSync': true,
 	'readTextFile': true,
 	'readTextFileSync': true,
+	'readDir': true,
 
 	'kill': MOCK_FN,
 	'exit': MOCK_FN,

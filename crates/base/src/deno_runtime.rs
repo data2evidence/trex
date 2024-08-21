@@ -413,6 +413,7 @@ where
         } = rt_provider;
 
         let op_fs = {
+            /* TODO: TREX ENABLE FILE ACCESS
             if is_user_worker {
                 Arc::new(StaticFs::new(
                     static_files,
@@ -421,9 +422,9 @@ where
                     vfs,
                     npm_snapshot,
                 )) as Arc<dyn deno_fs::FileSystem>
-            } else {
+            } else {*/
                 Arc::new(DenoCompileFileSystem::from_rc(vfs)) as Arc<dyn deno_fs::FileSystem>
-            }
+            //}
         };
 
         let mod_code = module_code;
