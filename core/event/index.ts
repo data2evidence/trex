@@ -7,9 +7,9 @@ for await (const data of eventManager) {
 		switch (data.event_type) {
 			case 'Log':
 				if (data.event.level === 'Error') {
-					//console.error(data.event.msg);
+					console.error(data.event.msg);
 				} else {
-					//console.dir(data.event.msg, { depth: Infinity });
+					console.dir(data.event.msg, { depth: Infinity });
 				}
 				break;
 			default:

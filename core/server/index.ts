@@ -68,7 +68,7 @@ if(env.NODE_ENV === 'development') {
 } else {
 
 }
-
+ 
 logger.log("Added plugins");
 logger.log('TREX started');
 
