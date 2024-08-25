@@ -22,8 +22,6 @@ async function _callInit (servicePath: string, imports) {
 	}
 	try { 
 		//logger.log(" "+req.url); 
-		logger.log(">>>INIT<<<"); 
-		console.log(servicePath)
 		const worker = await EdgeRuntime.userWorkers.create(options);
 	} catch (e) {
 		logger.error(e);
