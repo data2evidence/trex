@@ -9,6 +9,7 @@ import {createAuthc, AuthcType } from "./auth/Authc.ts"
 import { exchangeToken } from "./auth/token-handler.ts"
 import { addSub} from "./auth/addSubtoReq.ts"
 import {addPluginsDev} from "./plugin/plugin.ts"
+import { pgevents } from "./plugin/db.ts";
 
 const authType = env.GATEWAY_IDP_AUTH_TYPE as AuthcType
 
@@ -68,7 +69,11 @@ if(env.NODE_ENV === 'development') {
 } else {
 
 }
- 
+try {
+ pgevents('my-app-pub','myappslot',env.REP_PG)
+} catch (e) {
+
+}
 logger.log("Added plugins");
 logger.log('TREX started');
 

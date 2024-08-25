@@ -22,7 +22,8 @@ export const env = {
     LOGTO_TOKEN_URL: _env.LOGTO__TOKEN_URL,
     LOGTO_RESOURCE_API: _env.LOGTO__RESOURCE_API,
     GATEWAY_IDP_SUBJECT_PROP: _env.GATEWAY__IDP_SUBJECT_PROP,
-    BASE_PATH: "./plugins"
+    BASE_PATH: "./plugins",
+    REP_PG: _env.REP_PG
 
 }
 console.log(env);
