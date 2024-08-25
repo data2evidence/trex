@@ -1,6 +1,8 @@
 debug/
 target/
 temp/
+apifun/
+d2e-functions-old/
 .idea/
 .idea
 

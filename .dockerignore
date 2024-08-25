@@ -2,8 +2,12 @@ target/
 k6/
 examples/
 assets/
+build/
+plugins/
 .vscodes/
 .github/
+apifun/
+d2e-functions-old/
 
 scripts/*
 !scripts/install_onnx.sh
