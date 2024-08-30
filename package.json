@@ -10,7 +10,7 @@
     "startx": "deno run   --allow-net --allow-env --allow-read --allow-sys  ./apifun/pet/index.ts",
     "starty": "EDGE_RUNTIME_PORT=3000 RUST_BACKTRACE=full ./edge-runtime start  --main-service  ./apifun/pet2",
     "build": "shadow-cljs compile trex",
-    "watch": "EDGE_RUNTIME_PORT=33001 EDGE_RUNTIME_TLS=33000 npx nodemon --watch core -e ts --exec ./trex start --key ./cert/key.pem --cert ./cert/cert.pem --main-service ./core/server --event-worker ./core/event --inspect"
+    "watch": "mkdir -p ./cert ; echo \"$TLS__INTERNAL__CRT\" > ./cert/cert.pem & echo \"$TLS__INTERNAL__KEY\" > ./cert/key.pem & EDGE_RUNTIME_TLS=33000 npx nodemon --watch core -e ts --exec ./trex start --key ./cert/key.pem --cert ./cert/cert.pem --main-service ./core/server --event-worker ./core/event --inspect"
   },
   "keywords": [],
   "author": "",

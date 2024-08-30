@@ -3,20 +3,22 @@ import { serveStatic } from "jsr:@hono/hono/deno";
 import { STATUS_CODE } from 'https://deno.land/std/http/status.ts';
 const PREFECT_POOL = "docker-pool"
 const PREFECT_DOCKER_NETWORK = "alp_data";
-import {env, _env} from "../env.ts"
+import {env, _env, global} from "../env.ts"
 let logger = {log: (c) => typeof(c) == "string" ? console.log(`🦖 ${c}`) : console.log(c), error: (c) => console.error(c)};
 
 const headers = new Headers({
 	'Content-Type': 'application/json',
 });
 
-async function _callInit (servicePath: string, imports) {
+async function _callInit (servicePath: string, imports, myenv) {
 	const envVarsObj = _env;
-
+	//console.log(Object.keys(envVarsObj).map((k) => [k, envVarsObj[k]]))
+	//console.log(Object.keys(myenv).map((k) => [k, JSON.stringify(myenv[k])]))
+	//console.log(myenv);
 	const options = {servicePath: servicePath, memoryLimitMb: 150,
 		workerTimeoutMs: 30 * 60 * 1000, noModuleCache: false,
-		importMapPath: imports, envVars: Object.keys(envVarsObj).map((k) => [k, envVarsObj[k]]),
-		forceCreate: false, netAccessDisabled: false, 
+		importMapPath: imports, envVars: Object.keys(myenv).map((k) => [k, JSON.stringify(myenv[k])]),
+		forceCreate: env._FORCE_CREATE, netAccessDisabled: false, 
 		cpuTimeSoftLimitMs: 100000, cpuTimeHardLimitMs: 200000,
 		decoratorType: "typescript_with_metadata" 
 	}
@@ -36,12 +38,12 @@ async function _callInit (servicePath: string, imports) {
 }
     
 async function _callWorker (req: any, servicePath: string, imports) {
-	const envVarsObj = _env;
+	//const envVarsObj = _env;
 
 	const options = {servicePath: servicePath, memoryLimitMb: 150,
 		workerTimeoutMs: 30 * 60 * 1000, noModuleCache: false,
-		importMapPath: imports, envVars: Object.keys(envVarsObj).map((k) => [k, envVarsObj[k]]),
-		forceCreate: false, netAccessDisabled: false, 
+		importMapPath: imports, envVars: Object.keys(_env).map((k) => [k, _env[k]]),
+		forceCreate: env._FORCE_CREATE, netAccessDisabled: false, 
 		cpuTimeSoftLimitMs: 100000, cpuTimeHardLimitMs: 200000,
 		decoratorType: "typescript_with_metadata" 
 	}
@@ -98,8 +100,8 @@ function _addStatic(app, url, path) {
 	}));
 }
 
-function _addInit(path, imports) {
-	_callInit(`${path}`, imports);
+function _addInit(path, imports, env) {
+	_callInit(`${path}`, imports, env);
 }
 
 async function  _addPlugin(app, dir, pkg) {
@@ -109,12 +111,28 @@ async function  _addPlugin(app, dir, pkg) {
 	switch(key) {
 		case "functions":
 			if(value.init) {
-				value.init.forEach(r => {
+				for(const r of value.init) {
 					if(r.function) {
 						logger.log(`add init fn @ ${dir}${r.function}`)
-						_addInit(`${dir}${r.function}`, r.imports?  `${dir}${r.imports}` : null);
+						_addInit(`${dir}${r.function}`, r.imports?  `${dir}${r.imports}` : null, r.env?  Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[r.env]) : null); //Object.keys(envVarsObj).map((k) => [k, envVarsObj[k]])
+						if (r.delay) await new Promise(resolve => setTimeout(resolve, r.delay));
+						logger.log(`add init fn done @ ${dir}${r.function}`)
+
 					}
-				});
+				}
+			}
+			if(value.roles) {
+				for(const [name, cfg] of Object.entries(value.roles)) {
+					global.ROLE_SCOPES[name] = cfg;
+				}
+				//console.log(global.ROLE_SCOPES)
+
+			}
+			if(value.scopes) {
+				for(const s of value.scopes) {
+					global.REQUIRED_URL_SCOPES.push(s);
+				}
+				//console.log(global.REQUIRED_URL_SCOPES)
 			}
 			if(value.api)
 				value.api.forEach(r => {
@@ -136,8 +154,12 @@ async function  _addPlugin(app, dir, pkg) {
 					_addStatic(app, `${r.source}`, `${dir}${r.target}/`);
 			});
 			app.use('/portal/login', serveStatic({path: `${dir}/portal.index.html`}));
+			if(value.uiplugins) {
+				global.PLUGINS_JSON = JSON.stringify(value.uiplugins).replace(/\$\$FQDN\$\$/g, env.CADDY__ALP__PUBLIC_FQDN);
+			}
+			//console.log(global.PLUGINS_JSON);
 			break;
-		case "flow2":
+		case "flow":
 			try {
 				const dockerimg = value.dockerimage;
 				if(!env.PRFECT_API_URL) {

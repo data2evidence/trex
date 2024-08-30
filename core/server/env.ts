@@ -1,4 +1,10 @@
 export const _env = Deno.env.toObject();
+export let global = {
+    REQUIRED_URL_SCOPES: [],
+    ROLE_SCOPES: {},
+    PLUGINS_JSON: {}
+}
+//console.log(_env.SERVICE_ENV)
 export const env = {
     PRFECT_API_URL: _env.PREFECT_API_URL,
     TLS__INTERNAL__CRT: _env.TLS__INTERNAL__CRT?.replace(/\\n/g, '\n'),
@@ -10,7 +16,7 @@ export const env = {
     LOGTO_SCOPE: _env.LOGTO__SCOPE,
     APP_LOCALE: _env.APP_LOCALE,
     IDP_RELYING_PARTY: _env.IDP__RELYING_PARTY,
-    PLUGINS_JSON: _env.PLUGINS__JSON,
+   // PLUGINS_JSON: _env.PLUGINS__JSON,
     DB_CREDENTIALS_PUBLIC_KEYS: _env.DB_CREDENTIALS__PUBLIC_KEYS,
     GATEWAY_IDP_AUTH_TYPE: _env.GATEWAY__IDP_AUTH_TYPE,
     LOGTO_ISSUER: _env.LOGTO__ISSUER,
@@ -18,12 +24,15 @@ export const env = {
     LOGTO_SVC_CLIENT_ID: _env.LOGTO__SVC_CLIENT_ID,
     LOGTO_SVC_CLIENT_SECRET: _env.LOGTO__SVC_CLIENT_SECRET,
     NODE_ENV: _env.NODE_ENV,
+    _FORCE_CREATE: _env.NODE_ENV === 'development',
     LOGTO_CLIENT_SECRET: _env.LOGTO__CLIENT_SECRET,
     LOGTO_TOKEN_URL: _env.LOGTO__TOKEN_URL,
     LOGTO_RESOURCE_API: _env.LOGTO__RESOURCE_API,
     GATEWAY_IDP_SUBJECT_PROP: _env.GATEWAY__IDP_SUBJECT_PROP,
     BASE_PATH: "./plugins",
-    REP_PG: _env.REP_PG
+    REP_PG: _env.REP_PG,
+    SERVICE_ENV: JSON.parse(_env.SERVICE_ENV),
+    CADDY__ALP__PUBLIC_FQDN: _env.CADDY__ALP__PUBLIC_FQDN || 'localhost:41100'
 
 }
 console.log(env);

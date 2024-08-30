@@ -11,6 +11,7 @@ import { addSub} from "./auth/addSubtoReq.ts"
 import {addPluginsDev} from "./plugin/plugin.ts"
 import { pgevents } from "./plugin/db.ts";
 
+
 const authType = env.GATEWAY_IDP_AUTH_TYPE as AuthcType
 
 let logger = {log: (c) => typeof(c) == "string" ? console.log(`🦖 ${c}`) : console.log(c), error: (c) => console.error(c)};
@@ -68,7 +69,7 @@ if(env.NODE_ENV === 'development') {
 	await addPluginsDev(app);
 } else {
 
-}
+} 
 try {
  pgevents('my-app-pub','myappslot',env.REP_PG)
 } catch (e) {

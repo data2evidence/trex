@@ -1,5 +1,8 @@
 import { ITokenPayload } from 'npm:passport-azure-ad'
 //import { ROLES } from '../const'
+import {env} from "../env.ts"
+import { UserMgmtAPI} from "../api/UserMgmtAPI.ts"
+
 export const ROLES = {
   ALP_USER_ADMIN: 'ALP_USER_ADMIN',
   ALP_SYSTEM_ADMIN: 'ALP_SYSTEM_ADMIN',
@@ -14,6 +17,8 @@ export const ROLES = {
   ALP_ADMIN: 'ALP_ADMIN',
   ALP_OWNER: 'ALP_OWNER'
 }
+
+const subProp = env.GATEWAY_IDP_SUBJECT_PROP
 
 export type IAppTokenPayload = ITokenPayload & {
   given_name: string
@@ -57,7 +62,7 @@ interface IUser {
   groups: string[]
   adGroups?: string[]
 }
-
+/*
 const STUDY_RESEARCHER_ROLE: string[] = ['PA.svc', 'PAConfig.i18n', 'PAConfig.svc/read', 'CDWConfig.svc/read']
 
 const ALP_ADMIN_ROLE: string[] = [
@@ -79,7 +84,7 @@ const MRI_ROLE_ASSIGNMENTS = {
   STUDY_VIEWER_ROLE,
   ALP_OWNER_ROLE: ALP_ADMIN_ROLE,
   MRI_SUPER_USER: [...STUDY_RESEARCHER_ROLE, ...ALP_ADMIN_ROLE]
-}
+}*/
 
 export const SAMPLE_USER_JWT: IAppTokenPayload = {
   iss: 'https://dummy.com/aaaaaaaa-aaaa-aaaa-aaaa/v2.0/',
@@ -142,9 +147,10 @@ export function isClientCredToken(token) {
   return token.authType && token.authType === 'azure-ad'
 }
 
-const buildUserFromToken = (token: IAppTokenPayload): IUser => {
-  const { name, sub, email, userMgmtGroups, groups: adGroups } = token
+const buildUserFromToken = (token: IAppTokenPayload, ROLE_SCOPES): IUser => {
+  const { client_id, grant_type, name, sub, email, userMgmtGroups, groups: adGroups } = token
   const { alp_tenant_id, alp_role_study_researcher, alp_role_system_admin, groups } = userMgmtGroups
+  //const sub = token[subProp]
 
   if (typeof alp_tenant_id === 'undefined' || alp_tenant_id.length === 0) {
     console.error(`SECURITY INCIDENT: User does not belong to a tenant ${JSON.stringify(token)}`)
@@ -152,29 +158,69 @@ const buildUserFromToken = (token: IAppTokenPayload): IUser => {
   }
 
   const roles: string[] = []
-  const mriRoles: string[] = []
-  let mriScopes: string[] = []
+  //const mriRoles: string[] = []
 
+  if (grant_type === 'client_credentials' || sub === client_id) {
+    roles.push(sub)
+  } else {
+    const ctxUserGroups = userMgmtGroups
+    if (ctxUserGroups.alp_role_user_admin === true) {
+      roles.push(ROLES.ALP_USER_ADMIN)
+    }
+    if (ctxUserGroups.alp_role_system_admin === true) {
+      roles.push(ROLES.ALP_SYSTEM_ADMIN)
+    }
+    if (ctxUserGroups.alp_role_alp_sqleditor_admin === true) {
+      roles.push(ROLES.ALP_SQLEDITOR_ADMIN)
+    }
+    if (ctxUserGroups.alp_role_nifi_admin === true) {
+      roles.push(ROLES.ALP_NIFI_ADMIN)
+    }
+    if (ctxUserGroups.alp_role_dashboard_viewer === true) {
+      roles.push(ROLES.ALP_DASHBOARD_VIEWER)
+    }
+    if (ctxUserGroups.alp_role_tenant_viewer?.length > 0) {
+      roles.push(ROLES.TENANT_VIEWER)
+    }
+    if (ctxUserGroups.alp_role_study_researcher?.length > 0) {
+      for (const datasetId of ctxUserGroups.alp_role_study_researcher) {
+        //if (url.includes(datasetId) || url.includes('/system-portal/notebook') || url.includes('/terminology')) {
+        //  mriScopes.push(ROLES.STUDY_RESEARCHER)
+        //  break
+        //}
+      }
+    }
+  }
   if (alp_role_study_researcher && alp_role_study_researcher.length > 0) {
     roles.push(ROLES.STUDY_RESEARCHER)
-    mriRoles.push(ROLES.STUDY_RESEARCHER)
-    mriScopes.push(...MRI_ROLE_ASSIGNMENTS.STUDY_RESEARCHER_ROLE)
+    //mriRoles.push(ROLES.STUDY_RESEARCHER)
+    //mriScopes.push(...MRI_ROLE_ASSIGNMENTS.STUDY_RESEARCHER_ROLE)
   }
 
   if (alp_role_system_admin) {
     roles.push(ROLES.ALP_SYSTEM_ADMIN)
-    mriRoles.push(ROLES.ALP_SYSTEM_ADMIN)
-    mriScopes.push(...MRI_ROLE_ASSIGNMENTS.ALP_ADMIN_ROLE)
+    //mriRoles.push(ROLES.ALP_SYSTEM_ADMIN)
+    //mriScopes.push(...MRI_ROLE_ASSIGNMENTS.ALP_ADMIN_ROLE)
   }
 
-  mriScopes = (typeof groups === 'string' ? [] : groups).reduce((accumulator, group) => {
+  const mriRoles: string[] = Array.from(roles);
+  /*mriScopes = (typeof groups === 'string' ? [] : groups).reduce((accumulator, group) => {
     if (MRI_ROLE_ASSIGNMENTS[group]) {
       mriRoles.push(group)
       accumulator = accumulator.concat(MRI_ROLE_ASSIGNMENTS[group])
     }
 
     return accumulator
-  }, mriScopes)
+  }, mriScopes)*/
+  const roleScopesMap: Map<string, string[]> = new Map(Object.entries(ROLE_SCOPES))
+  const userScopes: string[] = []
+  roles.forEach(ctxRole => {
+    const roleScopes = roleScopesMap.get(ctxRole)
+    if (roleScopes) {
+      userScopes.push(...roleScopes)
+    }
+  })
+  let mriScopes: string[] = Array.from(new Set(userScopes));
 
   const user: IUser = {
     userId: sub,
@@ -221,7 +267,7 @@ export class MriUser {
   private isAlice = false
   private isClientCredReqUser = false
 
-  constructor(private token: IAppTokenPayload | string, private userLang: string = 'en') {
+  constructor(private token: IAppTokenPayload | string, ROLE_SCOPES, private userLang: string = 'en') {
     if (typeof token === 'string') {
       this.isAlice = true
       return
@@ -240,7 +286,7 @@ export class MriUser {
       throw new Error('token has no userMgmtGroups')
     }
 
-    this.b2cUser = buildUserFromToken(token)
+    this.b2cUser = buildUserFromToken(token, ROLE_SCOPES)
 
     this.userLang = userLang.split('-')[0]
   }
