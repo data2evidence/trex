@@ -10,6 +10,9 @@ export function addPortalRoute(app) {
   const SCOPE = env.LOGTO_SCOPE
 
 
+  app.get('/portal/plugin.json', (c) => {
+    return c.json(global.PLUGINS_JSON);
+  });
 
   app.get('/portal/env.js', (c) => {
     const clientEnv = {

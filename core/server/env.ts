@@ -4,6 +4,10 @@ export let global = {
     ROLE_SCOPES: {},
     PLUGINS_JSON: {}
 }
+
+export let logger = {log: (c) =>  console.log(c), error: (c) => console.error(c)};
+
+
 //console.log(_env.SERVICE_ENV)
 export const env = {
     PRFECT_API_URL: _env.PREFECT_API_URL,
@@ -24,12 +28,12 @@ export const env = {
     LOGTO_SVC_CLIENT_ID: _env.LOGTO__SVC_CLIENT_ID,
     LOGTO_SVC_CLIENT_SECRET: _env.LOGTO__SVC_CLIENT_SECRET,
     NODE_ENV: _env.NODE_ENV,
-    _FORCE_CREATE: _env.NODE_ENV === 'development',
+    _FORCE_CREATE: _env.WATCH_FUNCTIONS || false,
     LOGTO_CLIENT_SECRET: _env.LOGTO__CLIENT_SECRET,
     LOGTO_TOKEN_URL: _env.LOGTO__TOKEN_URL,
     LOGTO_RESOURCE_API: _env.LOGTO__RESOURCE_API,
     GATEWAY_IDP_SUBJECT_PROP: _env.GATEWAY__IDP_SUBJECT_PROP,
-    BASE_PATH: "./plugins",
+    BASE_PATH: _env.PLUGIN_BASE_PATH || "./plugins/node_modules",
     REP_PG: _env.REP_PG,
     PREFECT_DOCKER_NETWORK: "alp_data",
     PREFECT_POOL: "docker-pool",

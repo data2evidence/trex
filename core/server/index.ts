@@ -10,20 +10,16 @@ import {addPortalRoute} from "./standalone.ts"
 import { exchangeToken } from "./auth/token-handler.ts"
 import { addSub} from "./auth/addSubtoReq.ts"
 import {addPluginsDev} from "./plugin/plugin.ts"
-import { pgevents } from "./plugin/db.ts";
+import { pgevents } from "./plugin/dbfunctions.ts";
 import { ensureAuthorized } from "./auth/authz.ts";
 
 
-const authType = env.GATEWAY_IDP_AUTH_TYPE as AuthcType
-
-
-  
 const app = new Hono();
 app.use(hlogger())
 
-let logger = {log: (c) => typeof(c) == "string" ? console.log(`🦖 ${c}`) : console.log(c), error: (c) => console.error(c)};
+let logger = {log: (c) => console.log(c), error: (c) => console.error(c)};
 
-logger.log('TREX starting');
+logger.log('🦖 TREX initializing 🦖');
 //const authc = createAuthc(app)
 
 const headers = new Headers({
@@ -114,7 +110,7 @@ try {
 
 }
 logger.log("Added plugins");
-logger.log('TREX started');
+logger.log('🦖 TREX started 🦖');
 
 //logger.log(Deno.env.toObject());   
 const options = {
