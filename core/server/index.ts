@@ -1,18 +1,26 @@
-//import { runScript } from 'https://cdn.jsdelivr.net/npm/bebo@0.0.6/lib/bebo_core.js'
-//await runScript("./src/main.cljs");
-// @ts-ignore
 import { Hono } from "npm:hono";
 import { logger as hlogger } from "npm:hono/logger";
-//import express from 'npm:express'
-
 import {env, _env} from "./env.ts"
-import {addPortalRoute} from "./standalone.ts"
+import {addPortalRoute} from "./portal-routes.ts"
 import { exchangeToken } from "./auth/token-handler.ts"
 import { addSub} from "./auth/addSubtoReq.ts"
-import {addPluginsDev} from "./plugin/plugin.ts"
+import {Plugins} from "./plugin/plugin.ts"
 import { pgevents } from "./plugin/dbfunctions.ts";
 import { ensureAuthorized } from "./auth/authz.ts";
+import ora from 'npm:ora';
 
+//const spinner = ora({test:'Loading unicorns', color: 'green'}).start();
+
+//await Trex.execCmdx("npx", "yarn%add%file:./d2e-plugins", "./plugins")
+//await Trex.execCmdx("npx", "yarn%add%file:./d2e-ui", "./plugins")
+
+///spinner.text = "done"
+//spinner.succeed();
+
+await Trex.execCmd("ls", "-la", "./plugins")
+
+//console.log("sadasd")
+//Trex.execCmd("npasdx", "bun run", "./")
 
 const app = new Hono();
 app.use(hlogger())
@@ -20,7 +28,6 @@ app.use(hlogger())
 let logger = {log: (c) => console.log(c), error: (c) => console.error(c)};
 
 logger.log('🦖 TREX initializing 🦖');
-//const authc = createAuthc(app)
 
 const headers = new Headers({
 	'Content-Type': 'application/json',
@@ -62,7 +69,7 @@ app.use("*", async (c, n) => {
 			if(c.req.body)
 				y["body"] = await c.req.blob()
 			let r = new Request(c.req.raw.url, y);
-			EdgeRuntime.applySupabaseTag(c.req.raw, r);
+			Trex.applySupabaseTag(c.req.raw, r);
 			console.log(r)
 			console.log(c.req.raw)
 			c.req.raw = r;
@@ -72,7 +79,7 @@ app.use("*", async (c, n) => {
 //app.use(async (c, next) => { await ensureAuthorized(c.req.raw, c.res, next); await next() })
 
 app.get('/_internal/metric', async () => { 
-	const e = await EdgeRuntime.getRuntimeMetrics();
+	const e = await Trex.getRuntimeMetrics();
 	return Response.json(e);
 });
 
@@ -100,8 +107,9 @@ app.post('/oauth/token', async (c) => {
 
 logger.log("Add plugins");
 if(env.NODE_ENV === 'development') {
-	await addPluginsDev(app);
+	await Plugins.initPluginsDev(app);
 } else {
+	await Plugins.initPluginsEnv(app);
 
 } 
 try {

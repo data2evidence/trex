@@ -24,7 +24,7 @@ async function _callInit (servicePath: string, imports, myenv) {
 	}
 	try { 
 		//logger.log(" "+req.url); 
-		const worker = await EdgeRuntime.userWorkers.create(options);
+		const worker = await Trex.userWorkers.create(options);
 	} catch (e) {
 		logger.error(e);
 
@@ -50,7 +50,7 @@ async function _callWorker (req: any, servicePath: string, imports, myenv) {
 	}
 	try { 
 		//logger.log(" "+req.url); 
-		const worker = await EdgeRuntime.userWorkers.create(options);
+		const worker = await Trex.userWorkers.create(options);
 
 		const controller = new AbortController();
 

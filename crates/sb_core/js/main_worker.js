@@ -10,8 +10,22 @@ Object.defineProperty(globalThis, 'EdgeRuntime', {
 			userWorkers: SUPABASE_USER_WORKERS,
 			getRuntimeMetrics: () => /* async */ ops.op_runtime_metrics(),
 			applySupabaseTag: (src, dest) => applySupabaseTag(src, dest),
+			systemMemoryInfo: () => ops.op_system_memory_info()
+		};
+	},
+	configurable: true,
+});
+
+
+Object.defineProperty(globalThis, 'Trex', {
+	get() {
+		return {
+			userWorkers: SUPABASE_USER_WORKERS,
+			getRuntimeMetrics: () => /* async */ ops.op_runtime_metrics(),
+			applySupabaseTag: (src, dest) => applySupabaseTag(src, dest),
 			systemMemoryInfo: () => ops.op_system_memory_info(),
-			execCmd: /* async */ () => ops.op_run_cmd()
+			execCmd: /* async */ (cmd, arg, dir) => ops.op_run_cmd(cmd, arg, dir),
+			execCmdx: /* async */ (cmd, args, dir) => ops.op_run_cmdbun(cmd, args, dir)
 		};
 	},
 	configurable: true,

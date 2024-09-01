@@ -10,7 +10,7 @@ export let logger = {log: (c) =>  console.log(c), error: (c) => console.error(c)
 
 //console.log(_env.SERVICE_ENV)
 export const env = {
-    PRFECT_API_URL: _env.PREFECT_API_URL,
+    PREFECT_API_URL: _env.PREFECT_API_URL,
     TLS__INTERNAL__CRT: _env.TLS__INTERNAL__CRT?.replace(/\\n/g, '\n'),
     TLS__INTERNAL__KEY: _env.TLS__INTERNAL__KEY?.replace(/\\n/g, '\n'),
     TLS__INTERNAL__CA_CRT: _env.TLS__INTERNAL__CA_CRT?.replace(/\\n/g, '\n'),
@@ -28,19 +28,30 @@ export const env = {
     LOGTO_SVC_CLIENT_ID: _env.LOGTO__SVC_CLIENT_ID,
     LOGTO_SVC_CLIENT_SECRET: _env.LOGTO__SVC_CLIENT_SECRET,
     NODE_ENV: _env.NODE_ENV,
-    _FORCE_CREATE: _env.WATCH_FUNCTIONS || false,
+    _FORCE_CREATE: true, //_env.WATCH_FUNCTIONS || false,
     LOGTO_CLIENT_SECRET: _env.LOGTO__CLIENT_SECRET,
     LOGTO_TOKEN_URL: _env.LOGTO__TOKEN_URL,
     LOGTO_RESOURCE_API: _env.LOGTO__RESOURCE_API,
     GATEWAY_IDP_SUBJECT_PROP: _env.GATEWAY__IDP_SUBJECT_PROP,
-    BASE_PATH: _env.PLUGIN_BASE_PATH || "./plugins/node_modules",
+    BASE_PATH: _env.PLUGIN_BASE_PATH || "./plugins",
     REP_PG: _env.REP_PG,
     PREFECT_DOCKER_NETWORK: "alp_data",
     PREFECT_POOL: "docker-pool",
     SERVICE_ENV: JSON.parse(_env.SERVICE_ENV),
     CADDY__ALP__PUBLIC_FQDN: _env.CADDY__ALP__PUBLIC_FQDN || 'localhost:41100',
-    PREFECT_HEALTH_CHECK: _env.PREFECT_API_URL
+    PREFECT_HEALTH_CHECK: _env.PREFECT_API_URL,
+    INIT_PLUGINS: { 
+        "d2e-plugins": "../plugins/d2e-plugins",
+        "d2e-functions": "../plugins/d2ef",
+        "d2e-ui": "../plugins/d2e-ui" 
+                    },
+    PLUGIN_PATH: "./plugin",
+    PG__DB_NAME: _env.PG__DB_NAME,
+    PG__HOST: _env.PG__HOST,
+    PG__PORT: _env.PG__PORT,
+    PG_SUPER_USER: _env.PG_SUPER_USER,
+    PG_SUPER_PASSWORD: _env.PG_SUPER_PASSWORD
 
 }
-console.log(env);
+//console.log(env);
 

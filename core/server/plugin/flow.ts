@@ -5,7 +5,7 @@ import {waitfor} from "./utils.ts"
 
 export async function addFlowPlugin(value) {
 	try {
-		if(!env.PRFECT_API_URL) {
+		if(!env.PREFECT_API_URL) {
 			logger.error("Prefect URL not defined: skipping flow plugins");
 		}
 		await waitfor(env.PREFECT_HEALTH_CHECK);
@@ -13,7 +13,7 @@ export async function addFlowPlugin(value) {
 		
 		if(value.flows)
 			value.flows.forEach(async f => {
-				const res = await fetch(`${env.PRFECT_API_URL}/flows/`, {
+				const res = await fetch(`${env.PREFECT_API_URL}/flows/`, {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json"
@@ -27,7 +27,7 @@ export async function addFlowPlugin(value) {
 					logger.log(await res.json());
 				} else {
 					const jres = await res.json();
-					const res2 = await fetch(`${env.PRFECT_API_URL}/deployments/`, {
+					const res2 = await fetch(`${env.PREFECT_API_URL}/deployments/`, {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json"
