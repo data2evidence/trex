@@ -13,7 +13,14 @@ const PUBLIC_API_PATHS = ['^/system-portal/dataset/public/list(.*)', '^/system-p
 
 export async function ensureAuthorized(req, res, next) {
     const userMgmtApi = new UserMgmtAPI()
-    const { originalUrl, method, user: token } = req
+    const { url, originalUrl, method, token } = req
+    console.log("TOKEN")
+    const user = token
+    console.log(token);
+    console.log(method);
+    console.log(url);
+
+    
     const { oid, sub } = token
     const idpUserId = oid || sub
     const bearerToken = req.headers.authorization

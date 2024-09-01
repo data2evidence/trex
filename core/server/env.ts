@@ -31,8 +31,11 @@ export const env = {
     GATEWAY_IDP_SUBJECT_PROP: _env.GATEWAY__IDP_SUBJECT_PROP,
     BASE_PATH: "./plugins",
     REP_PG: _env.REP_PG,
+    PREFECT_DOCKER_NETWORK: "alp_data",
+    PREFECT_POOL: "docker-pool",
     SERVICE_ENV: JSON.parse(_env.SERVICE_ENV),
-    CADDY__ALP__PUBLIC_FQDN: _env.CADDY__ALP__PUBLIC_FQDN || 'localhost:41100'
+    CADDY__ALP__PUBLIC_FQDN: _env.CADDY__ALP__PUBLIC_FQDN || 'localhost:41100',
+    PREFECT_HEALTH_CHECK: _env.PREFECT_API_URL
 
 }
 console.log(env);

@@ -1,6 +1,6 @@
 import https from 'node:https'
 import { env } from '../env.ts'
-import { AuthcType } from './Authc.ts'
+import { AuthcType } from './authn.ts'
 //import { createLogger } from '../Logger.ts'
 import { OpenIDAPI } from '../api/OpenIDAPI.ts'
 import { post } from '../api/request-util.ts'

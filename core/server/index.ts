@@ -1,25 +1,30 @@
 //import { runScript } from 'https://cdn.jsdelivr.net/npm/bebo@0.0.6/lib/bebo_core.js'
 //await runScript("./src/main.cljs");
 // @ts-ignore
-import { Hono, adapter } from "jsr:@hono/hono";
+import { Hono } from "npm:hono";
+import { logger as hlogger } from "npm:hono/logger";
+//import express from 'npm:express'
 
 import {env, _env} from "./env.ts"
 import {addPortalRoute} from "./standalone.ts"
-import {createAuthc, AuthcType } from "./auth/Authc.ts"
 import { exchangeToken } from "./auth/token-handler.ts"
 import { addSub} from "./auth/addSubtoReq.ts"
 import {addPluginsDev} from "./plugin/plugin.ts"
 import { pgevents } from "./plugin/db.ts";
+import { ensureAuthorized } from "./auth/authz.ts";
 
 
 const authType = env.GATEWAY_IDP_AUTH_TYPE as AuthcType
 
+
+  
+const app = new Hono();
+app.use(hlogger())
+
 let logger = {log: (c) => typeof(c) == "string" ? console.log(`🦖 ${c}`) : console.log(c), error: (c) => console.error(c)};
 
 logger.log('TREX starting');
-  
-const app = new Hono();
-const authc = createAuthc(app)
+//const authc = createAuthc(app)
 
 const headers = new Headers({
 	'Content-Type': 'application/json',
@@ -35,7 +40,40 @@ app.get('/_internal/health', () => {
 		}) 
 	}
 );
-app.use("*", async (c, n) => {logger.log(`🚀REQUEST🚀 ${c.req.url}`); authc.authenticate(authType); addSub(c); await n(); });
+
+app.use("*", async (c, n) => {
+	//logger.log(`🚀REQUEST🚀 ${c.req.url}`);
+	
+
+	addSub(c);
+	//console.log("OK")
+	//console.log(c.req.query? c.req.query(): "ok")
+	//console.log(c.req.param? c.req.param(): "ok2")
+	//console.log(c.req.body? c.req.blob(): "ok2")
+	if(true || c.req.raw.url.startsWith('http://localhost:41100/oauth/token') 
+		|| c.req.raw.url.startsWith("http://localhost:41100/portal/login-callback")
+		|| c.req.raw.url.startsWith("http://localhost:41100/usermgmt/api/user-group/list")
+ 		|| c.req.raw.url == "http://localhost:41100/portal") {
+			console.log("OK")
+			console.log(c.req.param)
+		} else {
+			c.req.raw.headers["host"] ? c.req.raw.headers['x-source-origin'] = env.GATEWAY_WO_PROTOCOL_FQDN : null;
+			let x = new Headers(c.req.raw.headers)
+			x.append('x-source-origin', env.GATEWAY_WO_PROTOCOL_FQDN)
+			let y = {method: c.req.raw.method, headers: x};
+			if(c.req.raw.redirect)
+				y["redirect"] = c.req.raw.redirect
+			if(c.req.body)
+				y["body"] = await c.req.blob()
+			let r = new Request(c.req.raw.url, y);
+			EdgeRuntime.applySupabaseTag(c.req.raw, r);
+			console.log(r)
+			console.log(c.req.raw)
+			c.req.raw = r;
+		}
+	await n(); 
+});
+//app.use(async (c, next) => { await ensureAuthorized(c.req.raw, c.res, next); await next() })
 
 app.get('/_internal/metric', async () => { 
 	const e = await EdgeRuntime.getRuntimeMetrics();
