@@ -34,5 +34,5 @@ COPY package.json /usr/src
 RUN npm install
 
 
-CMD ["npm", "run", "watch"]
+CMD ["npm", "run", "start"]
 EXPOSE 33000
