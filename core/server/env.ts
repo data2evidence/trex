@@ -5,10 +5,24 @@ export let global = {
     PLUGINS_JSON: {}
 }
 
-export let logger = {log: (c) =>  console.log(c), error: (c) => console.error(c)};
+export let logger = {log: (c) => console.log(`\x1b[32m${c}`),info: (c) => console.log(`\x1b[32m${c}`), error: (c) => console.error(`\x1b[35m${c}`)};
 
 
-//console.log(_env.SERVICE_ENV)
+export const publicURLs = [
+    '/portalsvc/public-graphql',
+    '/usermgmt/api/user-group/public',
+    '/system-portal/dataset/public/list',
+    '/system-portal/feature/list',
+    '/system-portal/config/public/overview-description'
+  ]
+
+  export const authz_publicURLs = publicURLs.concat([
+    '/usermgmt/api/user-group/list'
+    //,'/db-credentials/db/list'
+  ])
+
+
+
 export const env = {
     PREFECT_API_URL: _env.PREFECT_API_URL,
     TLS__INTERNAL__CRT: _env.TLS__INTERNAL__CRT?.replace(/\\n/g, '\n'),
@@ -28,7 +42,7 @@ export const env = {
     LOGTO_SVC_CLIENT_ID: _env.LOGTO__SVC_CLIENT_ID,
     LOGTO_SVC_CLIENT_SECRET: _env.LOGTO__SVC_CLIENT_SECRET,
     NODE_ENV: _env.NODE_ENV,
-    _FORCE_CREATE: true, //_env.WATCH_FUNCTIONS || false,
+    _FORCE_CREATE: _env.WATCH_FUNCTIONS || false,
     LOGTO_CLIENT_SECRET: _env.LOGTO__CLIENT_SECRET,
     LOGTO_TOKEN_URL: _env.LOGTO__TOKEN_URL,
     LOGTO_RESOURCE_API: _env.LOGTO__RESOURCE_API,
@@ -50,8 +64,9 @@ export const env = {
     PG__HOST: _env.PG__HOST,
     PG__PORT: _env.PG__PORT,
     PG_SUPER_USER: _env.PG_SUPER_USER,
-    PG_SUPER_PASSWORD: _env.PG_SUPER_PASSWORD
+    PG_SUPER_PASSWORD: _env.PG_SUPER_PASSWORD,
+    IDP_ALP_SVC_CLIENT_ID: _env.IDP__ALP_SVC_CLIENT_ID,
+    IDP_DATA_SVC_CLIENT_ID: _env.IDP__ALP_DATA_CLIENT_ID
 
 }
-//console.log(env);
 

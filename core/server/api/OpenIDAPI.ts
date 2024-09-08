@@ -1,7 +1,7 @@
 import { AxiosResponse } from 'npm:axios'
 import jwt from 'npm:jsonwebtoken'
 import { post } from './request-util.ts'
-
+import {logger} from '../env.ts'
 interface IClientMetadata {
   issuerUrl: string
 }
@@ -43,7 +43,7 @@ export class OpenIDAPI {
         }
       })
     } catch (err) {
-      console.error('Error when getting client credentials token', err)
+      logger.error('Error when getting client credentials token' + err)
     }
 
     return result?.data

@@ -45,8 +45,7 @@ export class Plugins {
 					const pkg = JSON.parse(await Deno.readTextFile(`${env.BASE_PATH}/${plugin.name}/package.json`));
 					await Plugins.get().addPlugin(app, `${env.BASE_PATH}/${plugin.name}`, pkg, 'dev');
 				} catch(e) {
-					//console.log(plugin)
-					console.error(`${plugin.name} does not have a package.json`)
+					logger.error(`${plugin.name} does not have a package.json`)
 				}
 		}
 	}
@@ -63,18 +62,17 @@ export class Plugins {
 		} catch (e) {
 
 		}
-		console.log(_init)
 		for(const [name, url] of Object.entries(env.INIT_PLUGINS? env.INIT_PLUGINS: {})) {
 			if(_init.indexOf(name) == -1) {
 				await Trex.execCmdx("npx", `yarn%add%${url}`, `${env.PLUGIN_PATH}`)
 			}
 			else 
-				console.log(`skip install ${name} - already installed`)
+				logger.log(`skip install ${name} - already installed`)
 			try {
 				const pkg = JSON.parse(await Deno.readTextFile(`${env.PLUGIN_PATH}/node_modules/${name}/package.json`));
 				await plugin.addPlugin(app, `${env.PLUGIN_PATH}/node_modules/${name}`, pkg, url);
 			} catch(e) {
-				console.error(`${name} does not have a package.json`)
+				logger.error(`${name} does not have a package.json`)
 			}
 		}
 	}

@@ -1,11 +1,6 @@
 import axios, { AxiosRequestConfig } from 'npm:axios'
-//import { createLogger } from '../Logger.ts'
-//import * as dotenv from 'npm:dotenv'
 import https from 'node:https'
-import {env} from "../env.ts"
-//dotenv.config()
-
-const logger = console;//createLogger()
+import {env, logger} from "../env.ts"
 
 axios.defaults.timeout = 10000
 

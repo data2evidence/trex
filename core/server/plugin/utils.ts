@@ -1,3 +1,4 @@
+import {logger} from "../env.ts"
 export async function waitfor(url) {
 	let f = false;
 	while(!f) {
@@ -5,8 +6,7 @@ export async function waitfor(url) {
 			await fetch(url)
 			f = true
 		} catch (e) {
-			//console.log(e);
-			console.log(`${url} not reachable. waiting ...`)
+			logger.log(`${url} not reachable. waiting ...`)
 			await new Promise(resolve => setTimeout(resolve, 3000)); 
 		}
 	}

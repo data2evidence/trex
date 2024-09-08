@@ -21,5 +21,4 @@ export function addUIPlugin(app, value, dir) {
     if(value.uiplugins) {
         global.PLUGINS_JSON = JSON.stringify(value.uiplugins).replace(/\$\$FQDN\$\$/g, env.CADDY__ALP__PUBLIC_FQDN);
     }
-    //console.log(global.PLUGINS_JSON);
 }

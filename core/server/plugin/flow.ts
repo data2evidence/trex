@@ -54,6 +54,6 @@ export async function addFlowPlugin(value) {
 				}
 		});
 	} catch (e) {
-		console.log(e);
+		logger.log(e);
 	}
 }

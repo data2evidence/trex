@@ -1,12 +1,9 @@
 import https from 'node:https'
-import { env } from '../env.ts'
-import { AuthcType } from './authn.ts'
-//import { createLogger } from '../Logger.ts'
+import { env, logger } from '../env.ts'
 import { OpenIDAPI } from '../api/OpenIDAPI.ts'
 import { post } from '../api/request-util.ts'
 
-const logger = console;//createLogger('TokenHandler')
-const authType = env.GATEWAY_IDP_AUTH_TYPE as AuthcType
+const authType = 'logto'
 
 export const getClientCredentialsToken = async () => {
   let clientId: string | undefined,
@@ -48,8 +45,7 @@ export const exchangeToken = async (params: URLSearchParams) => {
     logger.error('Token URL is required to exchange token')
     return
   }
-  console.log("PARAMS")
-  console.log(params);
+
   const response = await post(tokenUrl, params, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     httpsAgent: new https.Agent({ rejectUnauthorized: false })

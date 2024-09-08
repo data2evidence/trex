@@ -1,8 +1,8 @@
-
-
 import {env, _env, global, logger} from "../env.ts"
 import {waitfor} from "./utils.ts"
-import {authenticate } from "../auth/authn.ts"
+import { authn } from "../auth/authn.ts"
+import { authz } from "../auth/authz.ts";
+
 import { STATUS_CODE } from 'https://deno.land/std/http/status.ts';
 
 const headers = new Headers({
@@ -12,9 +12,6 @@ const headers = new Headers({
 
 async function _callInit (servicePath: string, imports, myenv) {
 	const envVarsObj = _env;
-	//console.log(Object.keys(envVarsObj).map((k) => [k, envVarsObj[k]]))
-	//console.log(Object.keys(myenv).map((k) => [k, JSON.stringify(myenv[k])]))
-	//console.log(myenv);
 	const options = {servicePath: servicePath, memoryLimitMb: 150,
 		workerTimeoutMs: 1 * 60 * 1000, noModuleCache: false,
 		importMapPath: imports, envVars: myenv,
@@ -23,7 +20,6 @@ async function _callInit (servicePath: string, imports, myenv) {
 		decoratorType: "typescript_with_metadata" 
 	}
 	try { 
-		//logger.log(" "+req.url); 
 		const worker = await Trex.userWorkers.create(options);
 	} catch (e) {
 		logger.error(e);
@@ -31,17 +27,14 @@ async function _callInit (servicePath: string, imports, myenv) {
 		if (e instanceof Deno.errors.WorkerRequestCancelled) {
 			headers.append('Connection', 'close');			
 		}
-
 		const error = { msg: e.toString() };
 	}
 	return;
 }
     
 async function _callWorker (req: any, servicePath: string, imports, myenv) {
-	//const envVarsObj = _env;
-	//console.log(req);
 
-	const options = {servicePath: servicePath, memoryLimitMb: 150,
+	const options = {servicePath: servicePath, memoryLimitMb: 1000,
 		workerTimeoutMs: 30 * 60 * 1000, noModuleCache: false,
 		importMapPath: imports, envVars: myenv,
 		forceCreate: env._FORCE_CREATE, netAccessDisabled: false, 
@@ -49,7 +42,6 @@ async function _callWorker (req: any, servicePath: string, imports, myenv) {
 		decoratorType: "typescript_with_metadata" 
 	}
 	try { 
-		//logger.log(" "+req.url); 
 		const worker = await Trex.userWorkers.create(options);
 
 		const controller = new AbortController();
@@ -75,26 +67,18 @@ async function _callWorker (req: any, servicePath: string, imports, myenv) {
 };
 
 function _addFunction(app, url, path, imports, myenv) {
-	app.all(url+"/*", authenticate, (c) =>  _callWorker(c.req.raw, `${path}`, imports, myenv));
+	app.all(url+"/*", authn, authz, (c) =>  _callWorker(c.req.raw, `${path}`, imports, myenv));
 }
 
 
 function _addService(app, url, service, rmsrc) {
 	const service_url = env.SERVICE_ROUTES[service];
-	//const client = Deno.createHttpClient({ caCerts: [ env.TLS__INTERNAL__CA_CRT ] });
-	app.all(url+"/*", authenticate, async (c) => {
-		//console.log(c); 
-		//console.log(c.req.raw.headers);
+	app.all(url+"/*", authn, authz, async (c) => {
 		let newHeaders = new Headers(c.req.raw.headers)
 		newHeaders.append('x-source-origin', env.GATEWAY_WO_PROTOCOL_FQDN)
 		const path = rmsrc? c.req.raw.url.replace(/^[^#]*?:\/\/.*?\//,'/').replace(url,'') : c.req.raw.url.replace(/^[^#]*?:\/\/.*?\//,'/');
-		let req = {headers: newHeaders, bode: c.req.body, method: c.req.method};
-		if(c.req.body) {
-			req["body"] = await c.req.blob()
-		}
+		let req = {headers: newHeaders, method: c.req.method, body: c.req.raw.body};
 		const res = await fetch(`${service_url}${path}`,req )
-		//console.log(res);
-		//console.log(res.status)
 		return res;
 	});
 }
@@ -111,9 +95,6 @@ export async function addFunctionPlugin(app, value, dir) {
             if(r.function) {
                 logger.log(`add init fn @ ${dir}${r.function}`)
                 const myenv = Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[r.env])
-                //console.log(Object.keys(myenv).map((k) => [k, typeof(myenv[k])==="string"? myenv[k]:JSON.stringify(myenv[k])]))
-                //console.log(Object.keys(myenv).map((k) => [k, JSON.stringify(myenv[k])]))
-
                 _addInit(`${dir}${r.function}`,
                     r.imports?  `${dir}${r.imports}` : null,
                     r.env? Object.keys(myenv).map((k) => [k, typeof(myenv[k])==="string"? myenv[k]:JSON.stringify(myenv[k])]) : null,
@@ -126,22 +107,27 @@ export async function addFunctionPlugin(app, value, dir) {
     }
     if(value.roles) {
         for(const [name, cfg] of Object.entries(value.roles)) {
-            global.ROLE_SCOPES[name] = cfg;
+			let _name;
+			if(name === "IDP_ALP_SVC_CLIENT_ID")
+				_name = env.IDP_ALP_SVC_CLIENT_ID;
+			else if(name === "IDP_ALP_DATA_CLIENT_ID")
+				_name = env.IDP_DATA_SVC_CLIENT_ID;
+			else
+				_name = name
+            global.ROLE_SCOPES[_name] = cfg;
         }
-        //console.log(global.ROLE_SCOPES)
 
     }
     if(value.scopes) {
         for(const s of value.scopes) {
             global.REQUIRED_URL_SCOPES.push(s);
         }
-        //console.log(global.REQUIRED_URL_SCOPES)
     }
     if(value.api)
         value.api.forEach(r => {
         if(r.function) {
             logger.log(`add fn ${r.source} @ ${dir}${r.function}`)
-            const myenv = Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[r.env])
+			const myenv = Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[r.env], {DB_CREDENTIALS__PRIVATE_KEY: _env.DB_CREDENTIALS__PRIVATE_KEY})
             _addFunction(app, r.source, `${dir}${r.function}`, 
             r.imports?  `${dir}${r.imports}` : null, 
             r.env? Object.keys(myenv).map((k) => [k, typeof(myenv[k])==="string"? myenv[k]:JSON.stringify(myenv[k])]) : Object.keys(_env).map((k) => [k, _env[k]]));

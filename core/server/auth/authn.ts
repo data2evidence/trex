@@ -1,25 +1,16 @@
 
 import { createRemoteJWKSet, jwtVerify } from "npm:jose";
 import { Context } from "npm:hono";
-import { env } from '../env.ts'
+import { env, publicURLs, logger } from '../env.ts'
 
 export type AuthcType = 'logto'
 
-const logger = console;
-
-export const publicURLs = [
-  '/portalsvc/public-graphql',
-  '/usermgmt/api/user-group/public',
-  '/system-portal/dataset/public/list',
-  '/system-portal/feature/list',
-  '/system-portal/config/public/overview-description'
-]
 
 const JWKS = createRemoteJWKSet(
   new URL(`${env.LOGTO_ISSUER}/jwks`)
 );
 
-export async function authenticate(c: Context, next: Function) {
+export async function authn(c: Context, next: Function) {
 
   if(publicURLs.indexOf(c.req.path) > -1 ){
     logger.log(`PUBLIC URL ${c.req.path} ${publicURLs.indexOf(c.req.path)} NO AUTHN CHECK`);
