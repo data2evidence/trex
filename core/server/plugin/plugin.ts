@@ -24,7 +24,7 @@ export class Plugins {
 
 	private async initDB() {
 		let res = await this.pgclient.connect();
-		res = await this.pgclient.query("CREATE SCHEMA IF NOT EXISTS trex");
+		//res = await this.pgclient.query("CREATE SCHEMA IF NOT EXISTS trex");
 		res = await this.pgclient.query("CREATE TABLE IF NOT EXISTS trex.plugins (id VARCHAR(512) PRIMARY KEY, name VARCHAR(256), url VARCHAR(1024), type VARCHAR(256), payload JSONB, initialized BOOLEAN)");
 	}
 
@@ -81,7 +81,7 @@ export class Plugins {
 	async addPlugin(app, dir, pkg, url) {
 		try {
 			for (const [key, value] of Object.entries(pkg.trex)) {
-				const q = `INSERT INTO trex.plugins (id, name, url, type, payload, initialized) VALUES ('${pkg.name}${key}', '${pkg.name}', '${url}','${key}', '${JSON.stringify(value)}', 'false') ON CONFLICT(id) DO UPDATE SET name = EXCLUDED.name, url = EXCLUDED.url, type = EXCLUDED.type, payload = EXCLUDED.payload, initialized = EXCLUDED.initialized`
+				const q = `INSERT INTO trex.plugins (id, name, url, type, payload, initialized) VALUES ('${key}_${pkg.name}', '${pkg.name}', '${url}','${key}', '${JSON.stringify(value)}', 'false') ON CONFLICT(id) DO UPDATE SET name = EXCLUDED.name, url = EXCLUDED.url, type = EXCLUDED.type, payload = EXCLUDED.payload, initialized = EXCLUDED.initialized`
 				const r = await this.pgclient.query(q);
 				switch(key) {
 					case "functions":

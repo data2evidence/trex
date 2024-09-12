@@ -40,10 +40,10 @@ export async function addFlowPlugin(value) {
 						entrypoint: f.entrypoint,
 						job_variables: {
 							image: dockerimg,
-						image_pull_policy: "Never",
-						networks: [env.PREFECT_DOCKER_NETWORK]
-						}
-						})
+							image_pull_policy: "Never",
+							volumes: env.PREFECT_DOCKER_VOLUMES,
+							networks: [env.PREFECT_DOCKER_NETWORK]
+						}})
 					});
 					if(res2.status != 200) {
 						logger.error(`Error creating deployment`);
