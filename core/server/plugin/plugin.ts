@@ -17,9 +17,7 @@ export class Plugins {
 			port: parseInt(env.PG__PORT),
 			database: env.PG__DB_NAME,
 		  }
-		this.pgclient = new pg.Client(opt);
-		//this.initDB();
-		
+		this.pgclient = new pg.Client(opt);		
 	}
 
 	private async initDB() {
