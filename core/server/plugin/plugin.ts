@@ -18,7 +18,7 @@ export class Plugins {
 			database: env.PG__DB_NAME,
 		  }
 		this.pgclient = new pg.Client(opt);
-		this.initDB();
+		//this.initDB();
 		
 	}
 
@@ -30,9 +30,11 @@ export class Plugins {
 	private pgclient;
 	private static _plugin : Plugins;
 
-	public static get() {
-		if(!Plugins._plugin)
+	public static async get() {
+		if(!Plugins._plugin) {
 			Plugins._plugin = new Plugins();
+			await Plugins._plugin.initDB();
+		}
 		return Plugins._plugin;
 	}
 
@@ -47,7 +49,7 @@ export class Plugins {
 				logger.log(`Add Plugin ${plugin.name} from ${env.PLUGINS_DEV_PATH}`)
 				try {
 					const pkg = JSON.parse(await Deno.readTextFile(`${env.PLUGINS_DEV_PATH}/${plugin.name}/package.json`));
-					await Plugins.get().addPlugin(app, `${env.PLUGINS_DEV_PATH}/${plugin.name}`, pkg, 'dev');
+					await (await Plugins.get()).addPlugin(app, `${env.PLUGINS_DEV_PATH}/${plugin.name}`, pkg, 'dev');
 				} catch(e) {
 					logger.error(`${plugin.name} does not have a package.json`)
 				}
@@ -55,7 +57,7 @@ export class Plugins {
 	}
 
 	static async initPluginsEnv(app) {
-		const plugin = Plugins.get();
+		const plugin = await Plugins.get();
 		for(const name of env.PLUGINS_INIT) {
 			try { 
 				plugin.addPluginPackage(app, name)
