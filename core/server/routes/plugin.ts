@@ -4,9 +4,6 @@ import {Plugins} from "../plugin/plugin.ts"
 import {env} from "../env.ts"
 
 export function addPluginRoutes(app) {
-
-
-
     app.get('/trex/plugins', authn, authz, async (c) => {
         const p = Plugins.get();
         let plugins = (await p.getPlugins())["rows"];
