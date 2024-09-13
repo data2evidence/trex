@@ -24,8 +24,7 @@ Object.defineProperty(globalThis, 'Trex', {
 			getRuntimeMetrics: () => /* async */ ops.op_runtime_metrics(),
 			applySupabaseTag: (src, dest) => applySupabaseTag(src, dest),
 			systemMemoryInfo: () => ops.op_system_memory_info(),
-			execCmd: /* async */ (cmd, arg, dir) => ops.op_run_cmd(cmd, arg, dir),
-			execCmdx: /* async */ (cmd, args, dir) => ops.op_run_cmdbun(cmd, args, dir)
+			installPlugin: /* async */ (name, dir) => ops.op_install_plugin(name, dir)
 		};
 	},
 	configurable: true,

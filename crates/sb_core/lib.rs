@@ -321,36 +321,16 @@ fn op_runtime_memory_usage(scope: &mut v8::HandleScope) -> MemoryUsage {
 }
 
 #[op2(fast)]
-fn op_run_cmd(
-    #[string] cmd: String,
-    #[string] arg: String,
+fn op_install_plugin(
+    #[string] name: String,
     #[string] dir: String,
 ) {
-    let output = Command::new(cmd)
-        .arg(arg)
+    let output = Command::new("npx")
+        .args(["bun","install","-f","--silent","--no-cache","--no-save"])
+        .arg(name)
         .current_dir(dir)
         .status()
         .expect("failed to execute process");
-
-    // println!("stdout: {}", String::from_utf8_lossy(&output.stdout));
-
-}
-
-#[op2(fast)]
-fn op_run_cmdbun(
-    #[string] cmd: String,
-    #[string] args: String,
-    #[string] dir: String,
-) {
-    let output = Command::new(cmd)
-        .args(args.split("%"))
-        .current_dir(dir)
-        //.output()
-        .status()
-        .expect("failed to execute process");
-
-    // println!("stdout: {}", String::from_utf8_lossy(&output.stdout));
-
 }
 
 #[op2]
@@ -392,8 +372,7 @@ deno_core::extension!(
         op_read_line_prompt,
         op_set_exit_code,
         op_runtime_metrics,
-        op_run_cmd,
-        op_run_cmdbun,
+        op_install_plugin,
         op_schedule_mem_check,
         op_runtime_memory_usage,
         op_set_raw,

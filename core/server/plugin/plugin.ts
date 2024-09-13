@@ -24,9 +24,6 @@ export class Plugins {
 
 	private async initDB() {
 		let res = await this.pgclient.connect();
-		//res = await this.pgclient.query("CREATE SCHEMA IF NOT EXISTS trex");
-		//res = await this.pgclient.query("DROP TABLE trex.plugins");
-
 		res = await this.pgclient.query("CREATE TABLE IF NOT EXISTS trex.plugins (name VARCHAR(256) PRIMARY KEY, url VARCHAR(1024), version VARCHAR(256), payload JSONB, initialized BOOLEAN)");
 	}
 
@@ -65,7 +62,7 @@ export class Plugins {
 	}
 
 	async addPluginPackage(app, name) {
-		await Trex.execCmdx("npx", `bun%add%-f%--no-safe%--no-cache%@${env.GH_ORG}/${name}`, `${env.PLUGINS_PATH}`)
+		await Trex.installPlugin(`@${env.GH_ORG}/${name}`, `${env.PLUGINS_PATH}`)
 		try {
 			const pkg = JSON.parse(await Deno.readTextFile(`${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/package.json`));
 			await this.addPlugin(app, `${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/`, pkg, name);

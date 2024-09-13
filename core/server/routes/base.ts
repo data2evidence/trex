@@ -1,6 +1,6 @@
 import {env, logger} from "../env.ts"
 import { exchangeToken } from "../auth/token.ts"
-import { jwt } from "npm:jsonwebtoken"
+import * as jwt  from "npm:jsonwebtoken"
 
 const headers = new Headers({
 	'Content-Type': 'application/json',
