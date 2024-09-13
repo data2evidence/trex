@@ -7,7 +7,6 @@ export let global = {
 
 export let logger = {log: (c) => console.log(`\x1b[32m${c}`),info: (c) => console.log(`\x1b[32m${c}`), error: (c) => console.error(`\x1b[35m${c}`)};
 
-
 export const publicURLs = [
     '/portalsvc/public-graphql',
     '/usermgmt/api/user-group/public',
@@ -18,10 +17,7 @@ export const publicURLs = [
 
   export const authz_publicURLs = publicURLs.concat([
     '/usermgmt/api/user-group/list'
-    //,'/db-credentials/db/list'
   ])
-
-
 
 export const env = {
     PREFECT_API_URL: _env.PREFECT_API_URL,
@@ -34,7 +30,6 @@ export const env = {
     LOGTO_SCOPE: _env.LOGTO__SCOPE,
     APP_LOCALE: _env.APP_LOCALE,
     IDP_RELYING_PARTY: _env.IDP__RELYING_PARTY,
-   // PLUGINS_JSON: _env.PLUGINS__JSON,
     DB_CREDENTIALS_PUBLIC_KEYS: _env.DB_CREDENTIALS__PUBLIC_KEYS,
     GATEWAY_IDP_AUTH_TYPE: _env.GATEWAY__IDP_AUTH_TYPE,
     LOGTO_ISSUER: _env.LOGTO__ISSUER,
@@ -47,27 +42,29 @@ export const env = {
     LOGTO_TOKEN_URL: _env.LOGTO__TOKEN_URL,
     LOGTO_RESOURCE_API: _env.LOGTO__RESOURCE_API,
     GATEWAY_IDP_SUBJECT_PROP: _env.GATEWAY__IDP_SUBJECT_PROP,
-    BASE_PATH: _env.PLUGIN_BASE_PATH || "./plugins",
+    PLUGINS_DEV_PATH: _env.PLUGINS_DEV_PATH || "./plugins",
     REP_PG: _env.REP_PG,
     PREFECT_DOCKER_NETWORK: _env.PREFECT_DOCKER_NETWORK || "alp_data",
     PREFECT_POOL: "docker-pool",
     SERVICE_ENV: JSON.parse(_env.SERVICE_ENV),
     CADDY__ALP__PUBLIC_FQDN: _env.CADDY__ALP__PUBLIC_FQDN || 'localhost:41100',
     PREFECT_HEALTH_CHECK: _env.PREFECT_API_URL,
-    INIT_PLUGINS: { 
-        "d2e-plugins": "../plugins/d2e-plugins",
-        "d2e-functions": "../plugins/d2ef",
-        "d2e-ui": "../plugins/d2e-ui" 
-                    },
-    PLUGIN_PATH: "./plugin",
+    PLUGINS_INIT: _env.PLUGINS_SEED? JSON.parse(_env.PLUGINS_SEED) : [],
+    PLUGINS_PATH: _env.PLUGINS_PATH || "./plugin",
     PG__DB_NAME: _env.PG__DB_NAME,
     PG__HOST: _env.PG__HOST,
     PG__PORT: _env.PG__PORT,
-    PG_SUPER_USER: _env.PG_SUPER_USER,
-    PG_SUPER_PASSWORD: _env.PG_SUPER_PASSWORD,
+    PG__USER: _env.PG_MANAGE_USER,
+    PG__PASSWORD: _env.PG_MANAGE_PASSWORD,
+    //PG_SUPER_USER: _env.PG_SUPER_USER,
+    //PG_SUPER_PASSWORD: _env.PG_SUPER_PASSWORD,
     IDP_ALP_SVC_CLIENT_ID: _env.IDP__ALP_SVC_CLIENT_ID,
     IDP_DATA_SVC_CLIENT_ID: _env.IDP__ALP_DATA_CLIENT_ID,
-    PREFECT_DOCKER_VOLUMES: JSON.parse(_env.PREFECT_DOCKER_VOLUMES) || []
+    PREFECT_DOCKER_VOLUMES: JSON.parse(_env.PREFECT_DOCKER_VOLUMES) || [],
+    DB_CREDENTIALS__PRIVATE_KEY: _env.DB_CREDENTIALS__PRIVATE_KEY,
+    GIT_COMMIT: _env.GIT_COMMIT,
+    GH_TOKEN: _env.GH_TOKEN,
+    GH_ORG: 'alp-os'
 
 }
 

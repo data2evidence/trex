@@ -1,4 +1,4 @@
-import {env, _env, global, logger} from "../env.ts"
+import {env, global, logger} from "../env.ts"
 import {waitfor} from "./utils.ts"
 import { authn } from "../auth/authn.ts"
 import { authz } from "../auth/authz.ts";
@@ -11,7 +11,6 @@ const headers = new Headers({
 
 
 async function _callInit (servicePath: string, imports, myenv) {
-	const envVarsObj = _env;
 	const options = {servicePath: servicePath, memoryLimitMb: 150,
 		workerTimeoutMs: 1 * 60 * 1000, noModuleCache: false,
 		importMapPath: imports, envVars: myenv,
@@ -127,10 +126,10 @@ export async function addFunctionPlugin(app, value, dir) {
         value.api.forEach(r => {
         if(r.function) {
             logger.log(`add fn ${r.source} @ ${dir}${r.function}`)
-			const myenv = Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[r.env], {DB_CREDENTIALS__PRIVATE_KEY: _env.DB_CREDENTIALS__PRIVATE_KEY})
+			const myenv = Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[r.env], {DB_CREDENTIALS__PRIVATE_KEY: env.DB_CREDENTIALS__PRIVATE_KEY})
             _addFunction(app, r.source, `${dir}${r.function}`, 
             r.imports?  `${dir}${r.imports}` : null, 
-            r.env? Object.keys(myenv).map((k) => [k, typeof(myenv[k])==="string"? myenv[k]:JSON.stringify(myenv[k])]) : Object.keys(_env).map((k) => [k, _env[k]]));
+            r.env? Object.keys(myenv).map((k) => [k, typeof(myenv[k])==="string"? myenv[k]:JSON.stringify(myenv[k])]) : null);
         } else if (r.service) {  
             logger.log(`add svc ${r.source} @ ${r.service}`)
             _addService(app, r.source, r.service, r.rmsrc);

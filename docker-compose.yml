@@ -10,7 +10,7 @@ services:
       - 8001:8001
     volumes:
       - ./services/trex/core:/usr/src/core
-      - ./services/trex/plugins:/usr/src/plugins
+     # - ./services/trex/plugins:/usr/src/plugins
       - ./functions:/usr/src/plugins/d2ef
       - ./services/trex/package.json:/usr/src/package.json
     environment:

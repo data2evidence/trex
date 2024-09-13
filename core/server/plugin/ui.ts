@@ -1,6 +1,6 @@
 
 import { serveStatic } from "npm:hono/deno";
-import {env, _env, global, logger} from "../env.ts"
+import {env, global, logger} from "../env.ts"
 
 function _addStatic(app, url, path) {
 	logger.log(url + "   " + path);

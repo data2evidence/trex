@@ -1,0 +1,2 @@
+[install.scopes]
+"@alp-os" = { token = "$GH_TOKEN", url = "https://npm.pkg.github.com/" }

@@ -1,4 +1,4 @@
-import { env,global } from './env.ts'
+import { env,global } from '../env.ts'
 
 export function addPortalRoute(app) {
   const GATEWAY_WO_PROTOCOL_FQDN = env.GATEWAY_WO_PROTOCOL_FQDN!
@@ -18,7 +18,7 @@ export function addPortalRoute(app) {
     const clientEnv = {
       PUBLIC_URL: '/portal',
       REACT_APP_LOCALE: env.APP_LOCALE,
-      GIT_COMMIT: Deno.env.get("GIT_COMMIT"),
+      GIT_COMMIT: env.GIT_COMMIT,
       REACT_APP_IDP_RELYING_PARTY: env.IDP_RELYING_PARTY,
       REACT_APP_DN_BASE_URL: GATEWAY_PROTOCOL_FQDN,
       REACT_APP_CURRENT_SYSTEM: 'Local',

@@ -29,6 +29,7 @@ COPY --from=builder /root/edge-runtime /usr/src/trex
 COPY core /usr/src/core
 CMD mkdir /usr/src/plugin
 COPY package.json.plugin /usr/src/plugin/package.json
+COPY bunfig.toml /usr/src/plugin
 COPY package.json /usr/src
 
 RUN npm install

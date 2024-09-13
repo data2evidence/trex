@@ -1,10 +1,10 @@
 import { Hono } from "npm:hono";
 import { logger as hlogger } from "npm:hono/logger";
-import {env, _env, logger} from "./env.ts"
-import {addPortalRoute} from "./portal-routes.ts"
-import { exchangeToken } from "./auth/token-handler.ts"
+import {env, logger} from "./env.ts"
+import {addPortalRoute} from "./routes/portal.ts"
+import { exchangeToken } from "./auth/token.ts"
 import {Plugins} from "./plugin/plugin.ts"
-
+import { addPluginRoutes} from "./routes/plugin.ts"
 //import { pgevents } from "./plugin/dbfunctions.ts";
 
 const app = new Hono();
@@ -40,29 +40,20 @@ const getDecodedToken = (req: Request) => {
   }
 
 app.use("*", async (c, n) => {
-	/*if(c.req.raw.url.startsWith('http://localhost:41100/oauth/token') 
-		|| c.req.raw.url.startsWith("http://localhost:41100/portal/login-callback")
-		|| c.req.raw.url.startsWith("http://localhost:41100/usermgmt/api/user-group/list")
- 		|| c.req.raw.url == "http://localhost:41100/portal") {
-
-		} else {*/
-			c.req.raw.headers["host"] ? c.req.raw.headers['x-source-origin'] = env.GATEWAY_WO_PROTOCOL_FQDN : null;
-			let x = new Headers(c.req.raw.headers)
-			x.append('x-source-origin', env.GATEWAY_WO_PROTOCOL_FQDN)
-			//x.append('user', )
-			let y = {method: c.req.raw.method, headers: x, redirect: c.req.raw.redirect, body: c.req.raw.body};
-			const token = getDecodedToken(c.req.raw);
-			if(token && token[getDecodedToken(c.req.raw)] != null) {
-				y["user"] = {sub: getDecodedToken(c.req.raw)[env.GATEWAY_IDP_SUBJECT_PROP]};
-			}
-			let r = new Request(c.req.raw.url, y);
-			Trex.applySupabaseTag(c.req.raw, r);
-			c.req.raw = r;
-		//}
+	c.req.raw.headers["host"] ? c.req.raw.headers['x-source-origin'] = env.GATEWAY_WO_PROTOCOL_FQDN : null;
+	let x = new Headers(c.req.raw.headers)
+	x.append('x-source-origin', env.GATEWAY_WO_PROTOCOL_FQDN)
+	let y = {method: c.req.raw.method, headers: x, redirect: c.req.raw.redirect, body: c.req.raw.body};
+	const token = getDecodedToken(c.req.raw);
+	if(token && token[getDecodedToken(c.req.raw)] != null) {
+		y["user"] = {sub: getDecodedToken(c.req.raw)[env.GATEWAY_IDP_SUBJECT_PROP]};
+	}
+	let r = new Request(c.req.raw.url, y);
+	Trex.applySupabaseTag(c.req.raw, r);
+	c.req.raw = r;
 	await n(); 
 });
 
-//app.use(ensureAuthorized)
 
 app.get('/_internal/metric', async () => { 
 	const e = await Trex.getRuntimeMetrics();
@@ -92,12 +83,12 @@ app.post('/oauth/token', async (c) => {
   })
 
 logger.log("Add plugins");
+await Plugins.initPluginsEnv(app);
 if(env.NODE_ENV === 'development') {
 	await Plugins.initPluginsDev(app);
-} else {
-	await Plugins.initPluginsEnv(app);
+}
 
-} 
+addPluginRoutes(app);
 // try {
 //  pgevents('my-app-pub','myappslot',env.REP_PG)
 // } catch (e) {
@@ -105,5 +96,4 @@ if(env.NODE_ENV === 'development') {
 
 logger.log("Added plugins");
 logger.log('🦖 TREX started 🦖');
-
 Deno.serve(app.fetch);

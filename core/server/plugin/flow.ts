@@ -1,6 +1,6 @@
 
 
-import {env, _env, logger} from "../env.ts"
+import {env, logger} from "../env.ts"
 import {waitfor} from "./utils.ts"
 
 export async function addFlowPlugin(value) {
@@ -23,31 +23,34 @@ export async function addFlowPlugin(value) {
 					})
 				});
 				if(res.status != 200){
-					logger.log(`Error creating flow`);
-					logger.log(await res.json());
+					logger.log(`Error creating flow ${f.name}`);
+					logger.log(JSON.stringify(await res.json()));
 				} else {
 					const jres = await res.json();
-					const res2 = await fetch(`${env.PREFECT_API_URL}/deployments/`, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json"
-					},
-					body: JSON.stringify({
+					const body = {
 						name: f.name,
 						flow_id: jres.id,
 						work_pool_name: env.PREFECT_POOL,
 						work_queue_name: "default",
 						entrypoint: f.entrypoint,
+						enforce_parameter_schema: false,
 						job_variables: {
 							image: dockerimg,
 							image_pull_policy: "Never",
 							volumes: env.PREFECT_DOCKER_VOLUMES,
 							networks: [env.PREFECT_DOCKER_NETWORK]
-						}})
+						}};
+					if(f.parameter_openapi_schema) body["parameter_openapi_schema"] = JSON.parse(f.parameter_openapi_schema)
+					const res2 = await fetch(`${env.PREFECT_API_URL}/deployments/`, {
+					method: "POST",
+					headers: { 
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify(body)
 					});
 					if(res2.status != 200) {
-						logger.error(`Error creating deployment`);
-						logger.error(await res2.json());
+						logger.error(`Error creating deployment ${f.name}`);
+						logger.error(JSON.stringify(await res2.json()));
 					}
 					else
 						logger.log(`Add flow ${f.name}`);
