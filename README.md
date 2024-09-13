@@ -1,6 +1,6 @@
-## Trex
+## Trex 🦖
 
-### Plugin Instalation
+### Plugin Installation
 Endpoints:
 - `GET trex/plugins` list installed and available plugins
 - `POST trex/plugins/:name` installs the `name` plugin
