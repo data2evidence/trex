@@ -1,10 +1,12 @@
 import {authn} from "../auth/authn.ts"
 import {authz} from "../auth/authz.ts"
 import {Plugins} from "../plugin/plugin.ts"
-import {env} from "../env.ts"
+import {env, logger} from "../env.ts"
+import { HTTPException } from 'npm:hono/http-exception'
+
 
 export function addPluginRoutes(app) {
-    app.get('/trex/plugins', authn, authz, async (c) => {
+    app.get('/trex/plugins', authn, async (c) => {
         const p = Plugins.get();
         let plugins = (await p.getPlugins())["rows"];
         if(c.req.query('all')) {
@@ -23,18 +25,30 @@ export function addPluginRoutes(app) {
         return c.json(plugins);
     });
 
-    app.post('/trex/plugins/:name', authn, authz, async (c) => {
+    app.post('/trex/plugins/:name', authn, async (c) => {
         const p = Plugins.get();
-        const name = c.param.name;
-        p.addPluginPackage(app, name)
-        return c.json(await p.getPlugins());
+        const name = c.req.param('name');
+        try {
+            await p.addPluginPackage(app, name)
+        } catch(e) {
+            logger.error(`${name} failed to install plugin`)
+            throw new HTTPException(500, { message: `${name} failed to install plugin` })
+        }
+        const gp = (await p.getPlugins())["rows"]
+        return c.json(gp);
     });
 
-    app.put('/trex/plugins/:name', authn, authz, async (c) => {
+    app.put('/trex/plugins/:name', authn, async (c) => {
         const p = Plugins.get();
-        const name = c.param.name;
-        p.addPluginPackage(app, name)
-        return c.json(await p.getPlugins());
+        const name = c.req.param('name');
+        try {
+            await p.addPluginPackage(app, name)
+        } catch(e) {
+            logger.error(`${name} failed to install plugin`)
+            throw new HTTPException(500, { message: `${name} failed to update plugin` })
+        }
+        const gp = (await p.getPlugins())["rows"]
+        return c.json(gp);
     });
 
 }

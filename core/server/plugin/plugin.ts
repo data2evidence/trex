@@ -57,18 +57,19 @@ export class Plugins {
 	static async initPluginsEnv(app) {
 		const plugin = Plugins.get();
 		for(const name of env.PLUGINS_INIT) {
-			plugin.addPluginPackage(app, name)
+			try { 
+				plugin.addPluginPackage(app, name)
+			} catch(e) {
+				logger.error(`${name} failed to install plugin`)
+			}
 		}
 	}
 
 	async addPluginPackage(app, name) {
 		await Trex.installPlugin(`@${env.GH_ORG}/${name}`, `${env.PLUGINS_PATH}`)
-		try {
-			const pkg = JSON.parse(await Deno.readTextFile(`${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/package.json`));
-			await this.addPlugin(app, `${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/`, pkg, name);
-		} catch(e) {
-			logger.error(`${name} does not have a package.json`)
-		}
+		const pkg = JSON.parse(await Deno.readTextFile(`${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/package.json`));
+		await this.addPlugin(app, `${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/`, pkg, name);
+		
 	}
 	
 

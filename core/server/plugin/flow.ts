@@ -23,8 +23,9 @@ export async function addFlowPlugin(value) {
 					})
 				});
 				if(res.status != 200){
-					logger.log(`Error creating flow ${f.name}`);
-					logger.log(JSON.stringify(await res.json()));
+					logger.error(`Error creating flow ${f.name}`);
+					logger.error(`>${res.status}< ${JSON.stringify(await res.json())}`);
+
 				} else {
 					const jres = await res.json();
 					const body = {
@@ -50,10 +51,10 @@ export async function addFlowPlugin(value) {
 					});
 					if(res2.status != 200) {
 						logger.error(`Error creating deployment ${f.name}`);
-						logger.error(JSON.stringify(await res2.json()));
+						logger.error(`>${res2.status}< ${JSON.stringify(await res2.json())}`);
 					}
 					else
-						logger.log(`Add flow ${f.name}`);
+						logger.log(`>FLOW< Successfully deployed ${f.name}`);
 				}
 		});
 	} catch (e) {
