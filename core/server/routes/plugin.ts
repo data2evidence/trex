@@ -6,7 +6,7 @@ import { HTTPException } from 'npm:hono/http-exception'
 
 
 export function addPluginRoutes(app) {
-    app.get('/trex/plugins', authn, async (c) => {
+    app.get('/trex/plugins', authn, authz, async (c) => {
         const p = await Plugins.get();
         let plugins = (await p.getPlugins())["rows"];
         if(c.req.query('all')) {
@@ -25,7 +25,11 @@ export function addPluginRoutes(app) {
         return c.json(plugins);
     });
 
-    app.post('/trex/plugins/:name', authn, async (c) => {
+    app.patch('/trex/plugins', authn, authz, async (c) => {
+        Plugins.initPlugins(app);
+    })
+
+    app.post('/trex/plugins/:name', authn, authz, async (c) => {
         const p = await Plugins.get();
         const name = c.req.param('name');
         try {
@@ -38,7 +42,7 @@ export function addPluginRoutes(app) {
         return c.json(gp);
     });
 
-    app.put('/trex/plugins/:name', authn, async (c) => {
+    app.put('/trex/plugins/:name', authn, authz, async (c) => {
         const p = await Plugins.get();
         const name = c.req.param('name');
         try {

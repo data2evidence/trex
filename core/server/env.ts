@@ -1,7 +1,14 @@
 export const _env = Deno.env.toObject();
 export let global = {
-    REQUIRED_URL_SCOPES: [],
-    ROLE_SCOPES: {},
+    REQUIRED_URL_SCOPES: [{
+      "path": "^/trex/plugins(.*)",
+      "scopes": [
+        "plugins"
+      ]
+    }],
+    ROLE_SCOPES: {
+      "ALP_SYSTEM_ADMIN": ['plugins']
+    },
     PLUGINS_JSON: {}
 }
 

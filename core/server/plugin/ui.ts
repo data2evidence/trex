@@ -19,6 +19,13 @@ export function addUIPlugin(app, value, dir) {
     });
     app.use('/portal/login', serveStatic({path: `${dir}/portal.index.html`}));
     if(value.uiplugins) {
-        global.PLUGINS_JSON = JSON.stringify(value.uiplugins).replace(/\$\$FQDN\$\$/g, env.CADDY__ALP__PUBLIC_FQDN);
+        const tmp = JSON.stringify(value.uiplugins).replace(/\$\$FQDN\$\$/g, env.CADDY__ALP__PUBLIC_FQDN);
+        for(const [k,v] of Object.entries(tmp)) {
+            if(global.PLUGINS_JSON[k]) {
+                global.PLUGINS_JSON[k].concat(v).filter((v, i, self) => self.map(x => x["route"]).lastIndexOf(v["route"]) == i);
+            } else {
+                global.PLUGINS_JSON[k] = v;
+            }
+        }
     }
 }

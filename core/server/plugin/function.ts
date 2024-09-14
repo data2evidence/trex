@@ -113,14 +113,16 @@ export async function addFunctionPlugin(app, value, dir) {
 				_name = env.IDP_DATA_SVC_CLIENT_ID;
 			else
 				_name = name
-            global.ROLE_SCOPES[_name] = cfg;
+			if(global.ROLE_SCOPES[_name]) 
+				global.ROLE_SCOPES[_name].concat(cfg).unique()
+			else 
+            	global.ROLE_SCOPES[_name] = cfg;
         }
 
     }
     if(value.scopes) {
-        for(const s of value.scopes) {
-            global.REQUIRED_URL_SCOPES.push(s);
-        }
+        global.REQUIRED_URL_SCOPES.concat(value.scopes).filter((v, i, self) => self.map(x => x["path"]).lastIndexOf(v["path"]) == i);
+    }
     }
     if(value.api)
         value.api.forEach(r => {

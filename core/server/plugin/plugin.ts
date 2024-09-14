@@ -41,7 +41,7 @@ export class Plugins {
 		return res;
 	}
 
-	static async initPluginsDev(app) {
+	private static async initPluginsDev(app) {
 		for await (const plugin of Deno.readDir(`${env.PLUGINS_DEV_PATH}`)) {
 			if(plugin.isDirectory)
 				logger.log(`Add Plugin ${plugin.name} from ${env.PLUGINS_DEV_PATH}`)
@@ -54,7 +54,7 @@ export class Plugins {
 		}
 	}
 
-	static async initPluginsEnv(app) {
+	private static async initPluginsEnv(app) {
 		const plugin = await Plugins.get();
 		for(const name of env.PLUGINS_INIT) {
 			try { 
@@ -72,7 +72,6 @@ export class Plugins {
 		
 	}
 	
-
 	async addPlugin(app, dir, pkg, url) {
 		try {
 			const q = `INSERT INTO trex.plugins (name, url, version, payload, initialized) VALUES  ('${pkg.name.replace(new RegExp(`@${env.GH_ORG}/`),'')}', '${url}', '${pkg.version}', '${JSON.stringify(pkg.trex)}', 'false') ON CONFLICT(name) DO UPDATE SET url = EXCLUDED.url, version = EXCLUDED.version, payload = EXCLUDED.payload, initialized = EXCLUDED.initialized`
@@ -96,6 +95,14 @@ export class Plugins {
 			const r2 = await this.pgclient.query(q2);
 		} catch (e) { 
 			logger.error(e);
+		}
+	}
+
+	static async initPlugins(app) {
+		logger.log("Add plugins");
+		await Plugins.initPluginsEnv(app);
+		if(env.NODE_ENV === 'development') {
+			await Plugins.initPluginsDev(app);
 		}
 	}
 }

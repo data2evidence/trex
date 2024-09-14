@@ -16,7 +16,7 @@ export const ROLES = {
   ALP_DASHBOARD_VIEWER: 'ALP_DASHBOARD_VIEWER',
   TENANT_VIEWER: 'TENANT_VIEWER',
   RESEARCHER: 'RESEARCHER',
-  STUDY_RESEARCHER: 'STUDY_RESEARCHER_ROLE',
+  STUDY_RESEARCHER: 'RESEARCHER',
   VALIDATE_TOKEN_ROLE: 'VALIDATE_TOKEN',
   ADMIN_DATA_READER_ROLE: 'ADMIN_DATA_READER',
   BI_DATA_READER_ROLE: 'BI_DATA_READER',
@@ -123,7 +123,7 @@ const buildUserFromToken = (token: IAppTokenPayload, ROLE_SCOPES): IUser => {
       roles.push(ROLES.TENANT_VIEWER)
     }
     if (userMgmtGroups.alp_role_study_researcher?.length > 0) {
-      roles.push(ROLES.RESEARCHER)
+      //roles.push(ROLES.RESEARCHER)
       for (const datasetId of userMgmtGroups.alp_role_study_researcher) {
         //if (url.includes(datasetId) || url.includes('/system-portal/notebook') || url.includes('/terminology')) {
         //  break
