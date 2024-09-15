@@ -12,7 +12,7 @@ export let global = {
     PLUGINS_JSON: "{}"
 }
 
-export let logger = {log: (c) => console.log(`\x1b[32m${c}`),info: (c) => console.log(`\x1b[32m${c}`), error: (c) => console.error(`\x1b[35m${c}`)};
+export let logger = {log: (c) => console.log(`\x1b[32m${c}\x1b[0m`), info: (c) => console.log(`\x1b[32m${c}\x1b[0m`), debug: (c) => console.log(`\x1b[32m${c}\x1b[0m`), error: (c) => console.error(`\x1b[35m${c}\x1b[0m`)};
 
 export const publicURLs = [
     '/portalsvc/public-graphql',
@@ -70,7 +70,7 @@ export const env = {
     GIT_COMMIT: _env.GIT_COMMIT,
     GH_TOKEN: _env.GH_TOKEN,
     GH_ORG: 'alp-os',
-    PLUGINS_API_VERSION: _env.PLUGINS_API_VERSION
+    PLUGINS_API_VERSION: _env.PLUGINS_API_VERSION || 'latest'
 
 }
 

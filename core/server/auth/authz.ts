@@ -298,14 +298,15 @@ export async function authz(c, next) {
             return next()
           }
         } else {
-          logger.error(`\x1b[41m>>> NO datasetId defindes in scope @ ${c.req.method} ${c.req.path}<<<`)
-          logger.info(`\x1b[41mTMP OVERWRITE STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}`)
+          logger.error(`\x1b[0m\x1b[41m>>> NO datasetId defindes in scope @ ${c.req.method} ${c.req.path}<<<\x1b[0m`)
+          logger.info(`\x1b[0m\x1b[41mTMP OVERWRITE STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}\x1b[0m`)
           return next()
         }
 
 
       }
-      logger.info(`inside ensureAuthorized: Forbidden, token does not have required scope`)
+      logger.info(`inside authz: Forbidden, token does not have required scope`)
+      logger.debug(`inside authz: Forbidden url: ${originalUrl} scope: ${JSON.stringify(match)} user: ${JSON.stringify(mriUserObj)}`)
       throw new HTTPException(403, { res: new Response('Forbidden', {status: 403 })})
     } else {
       return userMgmtApi.getUserGroups(c.req.raw.headers.get('authorization'), idpUserId).then(userGroups => {

@@ -26,14 +26,14 @@ for await (const data of eventManager) {
 		switch (data.event_type) {
 			case 'Log':
 				if (data.event.level === 'Error') {
-					console.error(`\x1b[40m\x1b[32m${data.metadata.service_path}\x1b[0m\x1b[31m ${data.event.msg}`);
+					console.error(`\x1b[40m\x1b[32m${data.metadata.service_path}\x1b[0m\x1b[31m ${data.event.msg}\x1b[0m`);
 				} else {
-					console.log(`\x1b[40m\x1b[32m${data.metadata.service_path}\x1b[0m\x1b[34m ${data.event.msg}`);
+					console.log(`\x1b[40m\x1b[32m${data.metadata.service_path}\x1b[0m\x1b[34m ${data.event.msg}\x1b[0m`);
 					//console.dir(data.event.msg, { depth: Infinity });
 				}
 				break;
 			default:
-				console.log(`\x1b[40m\x1b[32m${data.metadata.service_path}\x1b[0m\x1b[90m User Worker Event: ${data.event_type}`)
+				console.log(`\x1b[40m\x1b[32m${data.metadata.service_path} User Worker Event:\x1b[0m\x1b[96m ${data.event_type}\x1b[0m`)
 				//console.dir(data, { depth: Infinity });
 		}
 	}

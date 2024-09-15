@@ -42,13 +42,13 @@ export function addPluginRoutes(app) {
 
     app.post('/trex/plugins/:name', authn, authz, async (c) => {
         const p = await Plugins.get();
-        const name = c.req.param('name');
+        let name = c.req.param('name');
         if(await p.isInstalled(name))
             throw new HTTPException(500, { message: `${name} is already installed` })
         try {
             await p.addPluginPackage(app, name)
         } catch(e) {
-            logger.error(`${name} failed to install plugin`)
+            logger.error(`${name} failed to install plugin ${JSON.stringify(e)}`)
             throw new HTTPException(500, { message: `${name} failed to install plugin` })
         }
         const gp = (await p.getPlugins())["rows"]
@@ -57,11 +57,11 @@ export function addPluginRoutes(app) {
 
     app.put('/trex/plugins/:name', authn, authz, async (c) => {
         const p = await Plugins.get();
-        const name = c.req.param('name');
+        let name = c.req.param('name');
         try {
             await p.addPluginPackage(app, name, true)
         } catch(e) {
-            logger.error(`${name} failed to install plugin`)
+            logger.error(`${name} failed to install plugin ${JSON.stringify(e)}`)
             throw new HTTPException(500, { message: `${name} failed to update plugin` })
         }
         const gp = (await p.getPlugins())["rows"]
@@ -71,7 +71,12 @@ export function addPluginRoutes(app) {
     app.delete('/trex/plugins/:name', authn, authz, async (c) => {
         const p = await Plugins.get();
         const name = c.req.param('name');
-        p.delete(name);
+        try {
+            p.delete(name);
+        } catch(e) {
+            logger.error(`${name} failed to delete plugin ${JSON.stringify(e)}`)
+            throw new HTTPException(500, { message: `${name} failed to delete plugin` })
+        }
         return c.json({"message": "ok"});
     })
 

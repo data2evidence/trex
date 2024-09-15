@@ -22,7 +22,7 @@ export class Plugins {
 
 	private async initDB() {
 		let res = await this.pgclient.connect();
-		res = await this.pgclient.query("CREATE TABLE IF NOT EXISTS trex.plugins (name VARCHAR(256) PRIMARY KEY, url VARCHAR(1024), version VARCHAR(256), payload JSONB, initialized BOOLEAN)");
+		res = await this.pgclient.query("CREATE TABLE IF NOT EXISTS trex.plugins (name VARCHAR(256) PRIMARY KEY, url VARCHAR(1024), version VARCHAR(256), payload JSONB)");
 	}
 
 	private pgclient;
@@ -67,7 +67,7 @@ export class Plugins {
 	}
 
 	async isInstalled(name) {
-		const q = `SELECT name, version, payload::JSON FROM trex.plugins where name = '${name}' and initialized = 'true'`
+		const q = `SELECT name, version, payload::JSON FROM trex.plugins where name = '${name}'`
 		const r = await this.pgclient.query(q);
 		if(r.rows.length > 0)
 			return r.rows[0]
@@ -75,19 +75,25 @@ export class Plugins {
 	}
 
 	async delete(name) {
-		const q = `DELETE from trex.plugins where name = ${name}`
+		const q = `DELETE from trex.plugins where name = '${name}'`
 		const r = await this.pgclient.query(q);
 		return r
 	}
 
 	async addPluginPackage(app, name, force = false) {
+		let pkgname = name
+		if(name.indexOf("@")<0 && env.PLUGINS_API_VERSION)
+			pkgname = `${name}@${env.PLUGINS_API_VERSION}`
+		else 
+			name = name.split("@")[0]
 		const _plugin = await this.isInstalled(name);
 		let pkg = {};
-		if(_plugin) {
+		if(_plugin && !force) {
 			logger.log(`skipping plugin install ${name} - already installed`)
 			pkg = {name: _plugin.name, version: _plugin.version, trex: _plugin.payload}
 		} else {
-			await Trex.installPlugin(`@${env.GH_ORG}/${name}`, `${env.PLUGINS_PATH}`)
+			
+			await Trex.installPlugin(`@${env.GH_ORG}/${pkgname}`, `${env.PLUGINS_PATH}`)
 			pkg = JSON.parse(await Deno.readTextFile(`${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/package.json`));
 		}
 		await this.addPlugin(app, `${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/`, pkg, name);
@@ -95,8 +101,6 @@ export class Plugins {
 	
 	async addPlugin(app, dir, pkg, url) {
 		try {
-			const q = `INSERT INTO trex.plugins (name, url, version, payload, initialized) VALUES  ('${pkg.name.replace(new RegExp(`@${env.GH_ORG}/`),'')}', '${url}', '${pkg.version}', '${JSON.stringify(pkg.trex)}', 'false') ON CONFLICT(name) DO UPDATE SET url = EXCLUDED.url, version = EXCLUDED.version, payload = EXCLUDED.payload, initialized = EXCLUDED.initialized`
-			const r = await this.pgclient.query(q);
 			for (const [key, value] of Object.entries(pkg.trex)) {
 				switch(key) {
 					case "functions":
@@ -112,8 +116,8 @@ export class Plugins {
 						logger.log(`Unknown type: ${key}`);
 				}
 			}
-			const q2 = `UPDATE trex.plugins set initialized='true' where "name"='${pkg.name}'`
-			const r2 = await this.pgclient.query(q2);
+			const q = `INSERT INTO trex.plugins (name, url, version, payload) VALUES  ('${pkg.name.replace(new RegExp(`@${env.GH_ORG}/`),'')}', '${url}', '${pkg.version}', '${JSON.stringify(pkg.trex)}') ON CONFLICT(name) DO UPDATE SET url = EXCLUDED.url, version = EXCLUDED.version, payload = EXCLUDED.payload`
+			const r = await this.pgclient.query(q);
 		} catch (e) { 
 			logger.error(e);
 		}
