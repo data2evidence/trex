@@ -9,7 +9,7 @@ export let global = {
     ROLE_SCOPES: {
       "ALP_SYSTEM_ADMIN": ['plugins']
     },
-    PLUGINS_JSON: {}
+    PLUGINS_JSON: "{}"
 }
 
 export let logger = {log: (c) => console.log(`\x1b[32m${c}`),info: (c) => console.log(`\x1b[32m${c}`), error: (c) => console.error(`\x1b[35m${c}`)};
@@ -69,7 +69,8 @@ export const env = {
     DB_CREDENTIALS__PRIVATE_KEY: _env.DB_CREDENTIALS__PRIVATE_KEY,
     GIT_COMMIT: _env.GIT_COMMIT,
     GH_TOKEN: _env.GH_TOKEN,
-    GH_ORG: 'alp-os'
+    GH_ORG: 'alp-os',
+    PLUGINS_API_VERSION: _env.PLUGINS_API_VERSION
 
 }
 

@@ -114,16 +114,16 @@ export async function addFunctionPlugin(app, value, dir) {
 			else
 				_name = name
 			if(global.ROLE_SCOPES[_name]) 
-				global.ROLE_SCOPES[_name].concat(cfg).unique()
+				global.ROLE_SCOPES[_name].concat(cfg).filter((v, i, self) => self.lastIndexOf(v) == i);
 			else 
             	global.ROLE_SCOPES[_name] = cfg;
         }
 
     }
     if(value.scopes) {
-        global.REQUIRED_URL_SCOPES.concat(value.scopes).filter((v, i, self) => self.map(x => x["path"]).lastIndexOf(v["path"]) == i);
+        global.REQUIRED_URL_SCOPES = global.REQUIRED_URL_SCOPES.concat(value.scopes).filter((v, i, self) => self.map(x => x["path"]).lastIndexOf(v["path"]) == i);
     }
-    }
+    
     if(value.api)
         value.api.forEach(r => {
         if(r.function) {

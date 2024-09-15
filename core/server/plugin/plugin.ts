@@ -47,6 +47,7 @@ export class Plugins {
 				logger.log(`Add Plugin ${plugin.name} from ${env.PLUGINS_DEV_PATH}`)
 				try {
 					const pkg = JSON.parse(await Deno.readTextFile(`${env.PLUGINS_DEV_PATH}/${plugin.name}/package.json`));
+					pkg.version = pkg.version+"-dev"
 					await (await Plugins.get()).addPlugin(app, `${env.PLUGINS_DEV_PATH}/${plugin.name}`, pkg, 'dev');
 				} catch(e) {
 					logger.error(`${plugin.name} does not have a package.json`)
@@ -65,11 +66,31 @@ export class Plugins {
 		}
 	}
 
-	async addPluginPackage(app, name) {
-		await Trex.installPlugin(`@${env.GH_ORG}/${name}`, `${env.PLUGINS_PATH}`)
-		const pkg = JSON.parse(await Deno.readTextFile(`${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/package.json`));
+	async isInstalled(name) {
+		const q = `SELECT name, version, payload::JSON FROM trex.plugins where name = '${name}' and initialized = 'true'`
+		const r = await this.pgclient.query(q);
+		if(r.rows.length > 0)
+			return r.rows[0]
+		return null
+	}
+
+	async delete(name) {
+		const q = `DELETE from trex.plugins where name = ${name}`
+		const r = await this.pgclient.query(q);
+		return r
+	}
+
+	async addPluginPackage(app, name, force = false) {
+		const _plugin = await this.isInstalled(name);
+		let pkg = {};
+		if(_plugin) {
+			logger.log(`skipping plugin install ${name} - already installed`)
+			pkg = {name: _plugin.name, version: _plugin.version, trex: _plugin.payload}
+		} else {
+			await Trex.installPlugin(`@${env.GH_ORG}/${name}`, `${env.PLUGINS_PATH}`)
+			pkg = JSON.parse(await Deno.readTextFile(`${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/package.json`));
+		}
 		await this.addPlugin(app, `${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/`, pkg, name);
-		
 	}
 	
 	async addPlugin(app, dir, pkg, url) {

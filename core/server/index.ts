@@ -4,7 +4,7 @@ import {env, logger} from "./env.ts"
 import {addPortalRoute} from "./routes/portal.ts"
 import {Plugins} from "./plugin/plugin.ts"
 import { addBaseRoutes } from "./routes/base.ts";
-import { addPluginRoutes} from "../routes/plugin.ts"
+import { addPluginRoutes} from "./routes/plugin.ts"
 
 logger.log('🦖 TREX initializing 🦖');
 
