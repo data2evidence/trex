@@ -56,8 +56,7 @@ export const env = {
     SERVICE_ENV: JSON.parse(_env.SERVICE_ENV),
     CADDY__ALP__PUBLIC_FQDN: _env.CADDY__ALP__PUBLIC_FQDN || 'localhost:41100',
     PREFECT_HEALTH_CHECK: _env.PREFECT_API_URL,
-    PLUGINS_INIT: _env.PLUGINS_SEED? JSON.parse(_env.PLUGINS_SEED) : [],
-    PLUGINS_PATH: _env.PLUGINS_PATH || "./plugin",
+  
     PG__DB_NAME: _env.PG__DB_NAME,
     PG__HOST: _env.PG__HOST,
     PG__PORT: _env.PG__PORT,
@@ -70,7 +69,10 @@ export const env = {
     GIT_COMMIT: _env.GIT_COMMIT,
     GH_TOKEN: _env.GH_TOKEN,
     GH_ORG: 'alp-os',
-    PLUGINS_API_VERSION: _env.PLUGINS_API_VERSION || 'latest'
+    PLUGINS_PATH: _env.PLUGINS_PATH || "./plugin",
+    PLUGINS_API_VERSION: _env.PLUGINS_API_VERSION || 'latest',
+    PLUGINS_INIT: _env.PLUGINS_SEED? JSON.parse(_env.PLUGINS_SEED) : [],
+    PLUGINS_SEED_UPDATE: _env.PLUGINS_SEED_UPDATE || false
 
 }
 

@@ -59,7 +59,7 @@ export class Plugins {
 		const plugin = await Plugins.get();
 		for(const name of env.PLUGINS_INIT) {
 			try { 
-				plugin.addPluginPackage(app, name)
+				plugin.addPluginPackage(app, name, env.PLUGINS_SEED_UPDATE)
 			} catch(e) {
 				logger.error(`${name} failed to install plugin`)
 			}
@@ -127,7 +127,11 @@ export class Plugins {
 		logger.log("Add plugins");
 		await Plugins.initPluginsEnv(app);
 		if(env.NODE_ENV === 'development') {
-			await Plugins.initPluginsDev(app);
+			try {
+				await Plugins.initPluginsDev(app);
+			} catch (e) {
+				logger.error(e)
+			}
 		}
 	}
 }
