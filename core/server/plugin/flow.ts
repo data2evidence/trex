@@ -41,7 +41,7 @@ export async function addFlowPlugin(value) {
 							volumes: env.PREFECT_DOCKER_VOLUMES,
 							networks: [env.PREFECT_DOCKER_NETWORK]
 						}};
-					if(f.parameter_openapi_schema) body["parameter_openapi_schema"] = JSON.parse(f.parameter_openapi_schema)
+					if(f.parameter_openapi_schema) body["parameter_openapi_schema"] = f.parameter_openapi_schema
 					const res2 = await fetch(`${env.PREFECT_API_URL}/deployments/`, {
 					method: "POST",
 					headers: { 
