@@ -291,11 +291,23 @@ export async function authz(c, next) {
         }
         return next()
       } else if(scopes.some(i => mriUserObj.studyScopes.includes(i))) {
+        let datasetId = null;
         if(match["datasetId"]) {
-          const datasetId = match["datasetId"].reduce((p,c) => p[c], c.req)
-          if(mriUserObj.alpRoleMap.STUDY_RESEARCHER_ROLE.indexOf(datasetId) > -1) {
-            logger.info(`AUTHORIZED STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}`)
-            return next()
+          const path = match["datasetId"]
+          datasetId = c.req.query(path);
+        } else {
+          datasetId = c.req.query("datasetId")
+        }
+        if(datasetId) {
+          if(datasetId) {
+            if(mriUserObj.alpRoleMap.STUDY_RESEARCHER_ROLE.indexOf(datasetId) > -1) {
+              logger.info(`AUTHORIZED STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}`)
+              return next()
+            } else {
+              logger.error(`datasetId check: No Access to datasetId ${datasetId}`)
+            }
+          } else {
+            logger.error(`datasetId check: No datasetId found ${type} ${path} ${JSON.stringify(c.req.raw)}`)
           }
         } else {
           logger.error(`\x1b[0m\x1b[41m>>> NO datasetId defindes in scope @ ${c.req.method} ${c.req.path}<<<\x1b[0m`)
