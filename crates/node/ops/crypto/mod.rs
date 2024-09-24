@@ -192,6 +192,7 @@ pub fn op_node_private_decrypt(
     match padding {
         1 => Ok(key.decrypt(Pkcs1v15Encrypt, &msg)?.into()),
         4 => Ok(key.decrypt(Oaep::new::<sha1::Sha1>(), &msg)?.into()),
+        8 => Ok(key.decrypt(Oaep::new::<sha2::Sha256>(), &msg)?.into()),
         _ => Err(type_error("Unknown padding")),
     }
 }
