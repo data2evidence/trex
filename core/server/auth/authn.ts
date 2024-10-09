@@ -16,9 +16,11 @@ export async function authn(c: Context, next: Function) {
     logger.log(`PUBLIC URL ${c.req.path} ${publicURLs.indexOf(c.req.path)} NO AUTHN CHECK`);
   } else {
     let token = "";
+    const regex = /\b(Bearer|bearer)\b/;
+    
     if (
       c.req.header("authorization") &&
-      c.req.header("authorization")?.split(" ")[0] === "Bearer"
+      c.req.header("authorization")?.split(" ")[0].match(regex)
     ) {
       token = c.req.header("authorization")?.split(" ")[1] || "";
     }
