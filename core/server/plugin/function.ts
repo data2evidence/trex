@@ -121,7 +121,7 @@ export async function addFunctionPlugin(app, value, dir) {
 
     }
     if(value.scopes) {
-        global.REQUIRED_URL_SCOPES = global.REQUIRED_URL_SCOPES.concat(value.scopes).filter((v, i, self) => self.map(x => x["path"]).lastIndexOf(v["path"]) == i);
+        global.REQUIRED_URL_SCOPES = global.REQUIRED_URL_SCOPES.concat(value.scopes)
     }
     
     if(value.api)
