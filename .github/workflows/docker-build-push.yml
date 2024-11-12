@@ -1,0 +1,54 @@
+name: Docker Build and Push to Azure CR
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  build-push-image:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include: 
+          - AZ_REGISTRY_REPOSITORY: trex/base
+            context: .
+            dockerfile: ./build/Dockerfile
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Setting up variables
+        id: setup
+        run: |
+          DOCKER_IMG_TAG_NAME=$(echo $(git rev-parse --short HEAD))
+          GIT_BRANCH_NAME=$(echo ${{ github.ref }} )
+          echo DOCKER_IMG_TAG_NAME=$DOCKER_IMG_TAG_NAME >> $GITHUB_OUTPUT 
+          echo GIT_BRANCH_NAME="${GIT_BRANCH_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Login to ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.AZ_REGISTRY_NAME }}.azurecr.io
+          username: ${{ secrets.AZ_REGISTRY_USERNAME }}
+          password: ${{ secrets.AZ_REGISTRY_PASSWORD }}
+        
+      - name: Build and Push
+        id: build-push
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          platforms: "linux/amd64"
+          tags: ${{ vars.AZ_REGISTRY_NAME }}.azurecr.io/${{ matrix.AZ_REGISTRY_REPOSITORY }}:${{ steps.setup.outputs.DOCKER_IMG_TAG_NAME }}, ${{ vars.AZ_REGISTRY_NAME }}.azurecr.io/${{ matrix.AZ_REGISTRY_REPOSITORY }}:main
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+
+      - name: Output Summary 
+        run: | 
+          echo "### Output summary 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "Job Status: ${{ job.status }} " >> $GITHUB_STEP_SUMMARY
+          echo "GIT_BRANCH_NAME: ${{ steps.setup.outputs.GIT_BRANCH_NAME }} " >> $GITHUB_STEP_SUMMARY
+          echo "GIT_COMMIT_ARG: ${{ github.sha }} " >> $GITHUB_STEP_SUMMARY
+          echo "AZ_REGISTRY_REPOSITORY: ${{ matrix.AZ_REGISTRY_REPOSITORY }} " >> $GITHUB_STEP_SUMMARY
+          echo "DOCKER_IMG_TAG_NAME: ${{ steps.setup.outputs.DOCKER_IMG_TAG_NAME }} " >> $GITHUB_STEP_SUMMARY
