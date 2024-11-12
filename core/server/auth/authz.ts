@@ -291,13 +291,17 @@ export async function authz(c, next) {
         }
         return next()
       } else if(scopes.some(i => mriUserObj.studyScopes.includes(i))) {
-        let datasetId = null;
-        if(match["datasetId"]) {
-          const path = match["datasetId"]
-          datasetId = c.req.query(path);
-        } else {
-          datasetId = c.req.query("datasetId")
+
+        let datasetId: string | null = null;
+        let datasetIdKey = match["datasetId"] ? match["datasetId"] : "datasetId"
+        // Look for datasetId in query param
+        datasetId = c.req.query(datasetIdKey);
+
+        // Look for datasetId in body if not found in query parameter
+        if (!datasetId) {
+          datasetId = await _lookForDatasetIdInBody(c, datasetIdKey)
         }
+
         if(datasetId) {
           if(datasetId) {
             if(mriUserObj.alpRoleMap.STUDY_RESEARCHER_ROLE.indexOf(datasetId) > -1) {
@@ -329,7 +333,15 @@ export async function authz(c, next) {
   }
   }
 
-
-  
-
-  
+  const _lookForDatasetIdInBody = async (
+    c,
+    datasetIdKey: string
+  ): Promise<string | null> => {
+    let datasetId = null;
+    // Clone req is required to not affect request body for downstream services 
+    const body = await c.req.raw.clone().json();
+    if (body) {
+      datasetId = body[datasetIdKey];
+    }
+    return datasetId;
+  };
