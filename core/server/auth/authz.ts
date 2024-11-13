@@ -314,7 +314,7 @@ export async function authz(c, next) {
             logger.error(`datasetId check: No datasetId found ${type} ${path} ${JSON.stringify(c.req.raw)}`)
           }
         } else {
-          logger.error(`\x1b[0m\x1b[41m>>> NO datasetId defindes in scope @ ${c.req.method} ${c.req.path}<<<\x1b[0m`)
+          logger.error(`\x1b[0m\x1b[41m>>> NO datasetId defined in scope @ ${c.req.method} ${c.req.path}<<<\x1b[0m`)
           logger.info(`\x1b[0m\x1b[41mTMP OVERWRITE STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}\x1b[0m`)
           return next()
         }
@@ -338,10 +338,19 @@ export async function authz(c, next) {
     datasetIdKey: string
   ): Promise<string | null> => {
     let datasetId = null;
-    // Clone req is required to not affect request body for downstream services 
-    const body = await c.req.raw.clone().json();
-    if (body) {
-      datasetId = body[datasetIdKey];
+
+    // Return null if body is empty
+    if (!c.req.raw.body) {
+      return null;
+    }
+
+    const contentType = c.req.header('Content-Type')
+    if (contentType === 'application/json') {
+      // Clone req is required to not affect request body for downstream services 
+      const body = await c.req.raw.clone().json();
+      if (body) {
+        datasetId = body[datasetIdKey];
+      }
     }
     return datasetId;
   };
