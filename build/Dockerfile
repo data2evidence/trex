@@ -35,6 +35,8 @@ COPY package-lock.json /usr/src
 
 RUN npm ci 
 
+# Allows usage of npx
+RUN ln -s /usr/src/node_modules/@oven/bun-linux-x64-baseline/bin/bun /usr/src/node_modules/.bin/bun
 
 CMD ["npm", "run", "start"]
 EXPOSE 33000
