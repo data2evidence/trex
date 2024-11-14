@@ -59,9 +59,10 @@ export class Plugins {
 		const plugin = await Plugins.get();
 		for(const name of env.PLUGINS_INIT) {
 			try { 
-				plugin.addPluginPackage(app, name, env.PLUGINS_SEED_UPDATE)
+				await plugin.addPluginPackage(app, name, env.PLUGINS_SEED_UPDATE)
 			} catch(e) {
 				logger.error(`${name} failed to install plugin`)
+				throw e
 			}
 		}
 	}

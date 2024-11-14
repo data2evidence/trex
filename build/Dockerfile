@@ -31,8 +31,9 @@ CMD mkdir /usr/src/plugin
 COPY package.json.plugin /usr/src/plugin/package.json
 COPY bunfig.toml /usr/src/plugin/bunfig.toml
 COPY package.json /usr/src
+COPY package-lock.json /usr/src
 
-RUN npm install
+RUN npm ci 
 
 
 CMD ["npm", "run", "start"]
