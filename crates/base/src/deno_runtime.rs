@@ -28,7 +28,7 @@ use sb_core::conn_sync::DenoRuntimeDropToken;
 use sb_core::http::sb_core_http;
 use sb_core::http_start::sb_core_http_start;
 use sb_core::util::sync::AtomicFlag;
-use sb_fs::static_fs::StaticFs;
+// use sb_fs::static_fs::StaticFs;
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -407,9 +407,9 @@ where
             vfs,
             module_loader,
             module_code,
-            static_files,
-            npm_snapshot,
-            vfs_path,
+            _static_files,
+            _npm_snapshot,
+            _vfs_path,
         } = rt_provider;
 
         let op_fs = {
