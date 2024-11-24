@@ -291,26 +291,26 @@ export async function authz(c, next) {
         }
         return next()
       } else if(scopes.some(i => mriUserObj.studyScopes.includes(i))) {
-        let datasetId = null;
-        if(match["datasetId"]) {
-          const path = match["datasetId"]
-          datasetId = c.req.query(path);
-        } else {
-          datasetId = c.req.query("datasetId")
+
+        let datasetId: string | null = null;
+        const datasetIdKey = match["datasetId"] ?? "datasetId"
+        // Look for datasetId in query param
+        datasetId = c.req.query(datasetIdKey);
+
+        // Look for datasetId in body if not found in query parameter
+        if (!datasetId) {
+          datasetId = await _lookForDatasetIdInBody(c, datasetIdKey)
         }
+
         if(datasetId) {
-          if(datasetId) {
-            if(mriUserObj.alpRoleMap.STUDY_RESEARCHER_ROLE.indexOf(datasetId) > -1) {
-              logger.info(`AUTHORIZED STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}`)
-              return next()
-            } else {
-              logger.error(`datasetId check: No Access to datasetId ${datasetId}`)
-            }
+          if(mriUserObj.alpRoleMap.STUDY_RESEARCHER_ROLE.indexOf(datasetId) > -1) {
+            logger.info(`AUTHORIZED STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}`)
+            return next()
           } else {
-            logger.error(`datasetId check: No datasetId found ${type} ${path} ${JSON.stringify(c.req.raw)}`)
+            logger.error(`datasetId check: No Access to datasetId ${datasetId}`)
           }
         } else {
-          logger.error(`\x1b[0m\x1b[41m>>> NO datasetId defindes in scope @ ${c.req.method} ${c.req.path}<<<\x1b[0m`)
+          logger.error(`\x1b[0m\x1b[41m>>> NO datasetId defined in scope @ ${c.req.method} ${c.req.path}<<<\x1b[0m`)
           logger.info(`\x1b[0m\x1b[41mTMP OVERWRITE STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}\x1b[0m`)
           return next()
         }
@@ -329,7 +329,24 @@ export async function authz(c, next) {
   }
   }
 
+  const _lookForDatasetIdInBody = async (
+    c,
+    datasetIdKey: string
+  ): Promise<string | null> => {
+    let datasetId = null;
 
-  
+    // Return null if body is empty
+    if (!c.req.raw.body) {
+      return null;
+    }
 
-  
+    const contentType = c.req.header('Content-Type')
+    if (contentType === 'application/json') {
+      // Clone req is required to not affect request body for downstream services 
+      const body = await c.req.raw.clone().json();
+      if (body) {
+        datasetId = body[datasetIdKey];
+      }
+    }
+    return datasetId;
+  };
