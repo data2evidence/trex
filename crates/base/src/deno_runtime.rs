@@ -407,9 +407,9 @@ where
             vfs,
             module_loader,
             module_code,
-            _static_files,
-            _npm_snapshot,
-            _vfs_path,
+            static_files: _,
+            npm_snapshot: _,
+            vfs_path: _,
         } = rt_provider;
 
         let op_fs = {
