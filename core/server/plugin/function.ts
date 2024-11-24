@@ -10,11 +10,14 @@ const headers = new Headers({
 });
 
 
-async function _callInit (servicePath: string, imports, myenv) {
+async function _callInit (servicePath: string, imports, fncfg) {
+	const myenv = Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[fncfg.env])
+	const _myenv =  Object.keys(myenv).map((k) => [k, typeof(myenv[k])==="string"? myenv[k]:JSON.stringify(myenv[k])]);
+	const watch = env.WATCH[fncfg.env] || false; 
 	const options = {servicePath: servicePath, memoryLimitMb: 150,
 		workerTimeoutMs: 1 * 60 * 1000, noModuleCache: false,
-		importMapPath: imports, envVars: myenv,
-		forceCreate: env._FORCE_CREATE, netAccessDisabled: false, 
+		importMapPath: imports, envVars: _myenv,
+		forceCreate: env._FORCE_CREATE || watch, netAccessDisabled: false, 
 		cpuTimeSoftLimitMs: 100000, cpuTimeHardLimitMs: 200000,
 		decoratorType: "typescript_with_metadata" 
 	}
@@ -31,12 +34,15 @@ async function _callInit (servicePath: string, imports, myenv) {
 	return;
 }
     
-async function _callWorker (req: any, servicePath: string, imports, myenv) {
+async function _callWorker (req: any, servicePath: string, imports, fncfg) {
+	const myenv = Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[fncfg.env], {DB_CREDENTIALS__PRIVATE_KEY: env.DB_CREDENTIALS__PRIVATE_KEY})
+	const _myenv = Object.keys(myenv).map((k) => [k, typeof(myenv[k])==="string"? myenv[k]:JSON.stringify(myenv[k])]);
+	const watch = env.WATCH[fncfg.env] || false; 
 
 	const options = {servicePath: servicePath, memoryLimitMb: 1000,
-		workerTimeoutMs: 30 * 60 * 1000, noModuleCache: false,
-		importMapPath: imports, envVars: myenv,
-		forceCreate: env._FORCE_CREATE, netAccessDisabled: false, 
+		workerTimeoutMs: env.WATCH[fncfg.env] ? 1 * 60 * 1000 : 30 * 60 * 1000, noModuleCache: false,
+		importMapPath: imports, envVars: _myenv,
+		forceCreate: env._FORCE_CREATE || watch, netAccessDisabled: false, 
 		cpuTimeSoftLimitMs: 100000, cpuTimeHardLimitMs: 200000,
 		decoratorType: "typescript_with_metadata" 
 	}
@@ -65,8 +71,8 @@ async function _callWorker (req: any, servicePath: string, imports, myenv) {
 	}
 };
 
-function _addFunction(app, url, path, imports, myenv) {
-	app.all(url+"/*", authn, authz, (c) =>  _callWorker(c.req.raw, `${path}`, imports, myenv));
+function _addFunction(app, url, path, imports, fncfg) {
+	app.all(url+"/*", authn, authz, (c) =>  _callWorker(c.req.raw, `${path}`, imports, fncfg));
 }
 
 
@@ -93,10 +99,9 @@ export async function addFunctionPlugin(app, value, dir) {
         for(const r of value.init) {
             if(r.function) {
                 logger.log(`add init fn @ ${dir}${r.function}`)
-                const myenv = Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[r.env])
                 _addInit(`${dir}${r.function}`,
                     r.imports?  `${dir}${r.imports}` : null,
-                    r.env? Object.keys(myenv).map((k) => [k, typeof(myenv[k])==="string"? myenv[k]:JSON.stringify(myenv[k])]) : null,
+                    r.env,
                     r.waitfor); //Object.keys(envVarsObj).map((k) => [k, envVarsObj[k]])
                 if (r.delay) await new Promise(resolve => setTimeout(resolve, r.delay));
                 logger.log(`add init fn done @ ${dir}${r.function}`)
@@ -128,10 +133,9 @@ export async function addFunctionPlugin(app, value, dir) {
         value.api.forEach(r => {
         if(r.function) {
             logger.log(`add fn ${r.source} @ ${dir}${r.function}`)
-			const myenv = Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[r.env], {DB_CREDENTIALS__PRIVATE_KEY: env.DB_CREDENTIALS__PRIVATE_KEY})
             _addFunction(app, r.source, `${dir}${r.function}`, 
             r.imports?  `${dir}${r.imports}` : null, 
-            r.env? Object.keys(myenv).map((k) => [k, typeof(myenv[k])==="string"? myenv[k]:JSON.stringify(myenv[k])]) : null);
+            r);
         } else if (r.service) {  
             logger.log(`add svc ${r.source} @ ${r.service}`)
             _addService(app, r.source, r.service, r.rmsrc);
