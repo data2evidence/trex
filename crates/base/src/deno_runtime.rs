@@ -423,7 +423,7 @@ where
                     npm_snapshot,
                 )) as Arc<dyn deno_fs::FileSystem>
             } else {*/
-                Arc::new(DenoCompileFileSystem::from_rc(vfs)) as Arc<dyn deno_fs::FileSystem>
+            Arc::new(DenoCompileFileSystem::from_rc(vfs)) as Arc<dyn deno_fs::FileSystem>
             //}
         };
 
@@ -1459,7 +1459,8 @@ mod test {
                 "<anon>",
                 ModuleCodeString::from(
                     // NOTE: Base path is `./test_cases/main`.
-                    r#"Deno.readTextFileSync(Deno.cwd() +   "/test_cases/main/content.md")"#.to_string(),
+                    r#"Deno.readTextFileSync(Deno.cwd() +   "/test_cases/main/content.md")"#
+                        .to_string(),
                 ),
             )
             .unwrap();
