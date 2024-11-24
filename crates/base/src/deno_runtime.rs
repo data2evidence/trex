@@ -28,7 +28,7 @@ use sb_core::conn_sync::DenoRuntimeDropToken;
 use sb_core::http::sb_core_http;
 use sb_core::http_start::sb_core_http_start;
 use sb_core::util::sync::AtomicFlag;
-use sb_fs::static_fs::StaticFs;
+// use sb_fs::static_fs::StaticFs;
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -407,9 +407,9 @@ where
             vfs,
             module_loader,
             module_code,
-            static_files,
-            npm_snapshot,
-            vfs_path,
+            static_files: _,
+            npm_snapshot: _,
+            vfs_path: _,
         } = rt_provider;
 
         let op_fs = {
@@ -1459,7 +1459,7 @@ mod test {
                 "<anon>",
                 ModuleCodeString::from(
                     // NOTE: Base path is `./test_cases/main`.
-                    r#"Deno.readTextFileSync("content.md")"#.to_string(),
+                    r#"Deno.readTextFileSync(Deno.cwd() +   "/test_cases/main/content.md")"#.to_string(),
                 ),
             )
             .unwrap();

@@ -325,7 +325,7 @@ fn op_install_plugin(
     #[string] name: String,
     #[string] dir: String,
 ) {
-    let output = Command::new("npx")
+    Command::new("npx")
         .args(["bun","install","-f","--silent","--no-cache","--no-save"])
         .arg(name)
         .current_dir(dir)

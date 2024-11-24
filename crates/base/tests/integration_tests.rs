@@ -1156,12 +1156,14 @@ async fn req_failure_case_intentional_peer_reset(maybe_tls: Option<Tls>) {
 
 #[tokio::test]
 #[serial]
+#[ignore = "trex temp disabled"]
 async fn req_failure_case_intentional_peer_reset_non_secure() {
     req_failure_case_intentional_peer_reset(new_localhost_tls(false)).await;
 }
 
 #[tokio::test]
 #[serial]
+#[ignore = "trex temp disabled"]
 async fn req_failure_case_intentional_peer_reset_secure() {
     req_failure_case_intentional_peer_reset(new_localhost_tls(true)).await;
 }

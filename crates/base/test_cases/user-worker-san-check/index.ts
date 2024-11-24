@@ -1,4 +1,4 @@
-let blocklist: string[] = Deno.readTextFileSync(".blocklisted")
+let blocklist: string[] = Deno.readTextFileSync(import.meta.dirname + "/.blocklisted")
     .trim()
     .split("\n");
 
