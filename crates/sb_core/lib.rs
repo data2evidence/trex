@@ -13,9 +13,8 @@ use futures::task::AtomicWaker;
 use futures::FutureExt;
 use log::error;
 use serde::Serialize;
-use tokio::sync::oneshot;
 use std::process::Command;
-
+use tokio::sync::oneshot;
 
 mod upgrade;
 
@@ -321,12 +320,16 @@ fn op_runtime_memory_usage(scope: &mut v8::HandleScope) -> MemoryUsage {
 }
 
 #[op2(fast)]
-fn op_install_plugin(
-    #[string] name: String,
-    #[string] dir: String,
-) {
+fn op_install_plugin(#[string] name: String, #[string] dir: String) {
     Command::new("npx")
-        .args(["bun","install","-f","--silent","--no-cache","--no-save"])
+        .args([
+            "bun",
+            "install",
+            "-f",
+            "--silent",
+            "--no-cache",
+            "--no-save",
+        ])
         .arg(name)
         .current_dir(dir)
         .status()
