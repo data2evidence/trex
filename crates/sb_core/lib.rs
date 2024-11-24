@@ -322,7 +322,8 @@ fn op_runtime_memory_usage(scope: &mut v8::HandleScope) -> MemoryUsage {
 #[op2(fast)]
 fn op_install_plugin(#[string] name: String, #[string] dir: String) {
     Command::new("npx")
-        .args(["bun",
+        .args([
+            "bun",
             "install",
             "-f",
             "--silent",
