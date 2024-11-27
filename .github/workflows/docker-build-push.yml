@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         include: 
-          - AZ_REGISTRY_REPOSITORY: d2e-trex-base
+          - AZ_REGISTRY_REPOSITORY: alp-data-node/trex
             context: .
             dockerfile: ./build/Dockerfile
 
