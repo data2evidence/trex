@@ -10,10 +10,10 @@ const headers = new Headers({
 });
 
 
-async function _callInit (servicePath: string, imports, fncfg) {
-	const myenv = Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[fncfg.env])
+async function _callInit (servicePath: string, imports, fnEnv) {
+	const myenv = Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[fnEnv])
 	const _myenv =  Object.keys(myenv).map((k) => [k, typeof(myenv[k])==="string"? myenv[k]:JSON.stringify(myenv[k])]);
-	const watch = env.WATCH[fncfg.env] || false; 
+	const watch = env.WATCH[fnEnv] || false; 
 	const options = {servicePath: servicePath, memoryLimitMb: 150,
 		workerTimeoutMs: 1 * 60 * 1000, noModuleCache: false,
 		importMapPath: imports, envVars: _myenv,
