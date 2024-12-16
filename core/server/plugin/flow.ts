@@ -37,7 +37,7 @@ export async function addFlowPlugin(value) {
 						enforce_parameter_schema: false,
 						job_variables: {
 							image: dockerimg,
-							image_pull_policy: "Never",
+							image_pull_policy: "Always",
 							volumes: env.PREFECT_DOCKER_VOLUMES,
 							networks: [env.PREFECT_DOCKER_NETWORK]
 						}};
