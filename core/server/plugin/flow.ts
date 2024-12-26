@@ -9,7 +9,6 @@ export async function addFlowPlugin(value) {
 			logger.error("Prefect URL not defined: skipping flow plugins");
 		}
 		await waitfor(env.PREFECT_HEALTH_CHECK);
-		const dockerimg = value.dockerimage;
 		
 		if(value.flows)
 			value.flows.forEach(async f => {
@@ -36,8 +35,8 @@ export async function addFlowPlugin(value) {
 						entrypoint: f.entrypoint,
 						enforce_parameter_schema: false,
 						job_variables: {
-							image: dockerimg,
-							image_pull_policy: "Never",
+							image: f.image,
+							image_pull_policy: f.image_pull_policy,
 							volumes: env.PREFECT_DOCKER_VOLUMES,
 							networks: [env.PREFECT_DOCKER_NETWORK]
 						}};
