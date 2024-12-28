@@ -4,14 +4,13 @@ use std::path::PathBuf;
 
 mod supabase_startup_snapshot {
     use super::*;
+    use deno_cache::SqliteBackedCache;
     use deno_core::error::AnyError;
     use deno_core::snapshot::{create_snapshot, CreateSnapshotOptions};
     use deno_core::Extension;
     use deno_fs::OpenOptions;
     use deno_http::DefaultHttpPropertyExtractor;
     use deno_io::fs::FsError;
-    use event_worker::js_interceptors::sb_events_js_interceptors;
-    use event_worker::sb_user_event_worker;
     use sb_ai::sb_ai;
     use sb_core::http::sb_core_http;
     use sb_core::http_start::sb_core_http_start;
@@ -21,6 +20,8 @@ mod supabase_startup_snapshot {
     use sb_core::sb_core_main_js;
     use sb_core::transpiler::maybe_transpile_source;
     use sb_env::sb_env;
+    use sb_event_worker::js_interceptors::sb_events_js_interceptors;
+    use sb_event_worker::sb_user_event_worker;
     use sb_node::deno_node;
     use sb_workers::sb_user_workers;
     use std::borrow::Cow;
@@ -159,24 +160,24 @@ mod supabase_startup_snapshot {
             unreachable!("snapshotting!")
         }
 
-        fn check_read(&self, _path: &Path) -> Result<(), AnyError> {
+        fn check_read(&mut self, _path: &Path) -> Result<(), AnyError> {
             unreachable!("snapshotting!")
         }
 
         fn check_read_with_api_name(
-            &self,
+            &mut self,
             _path: &Path,
             _api_name: Option<&str>,
         ) -> Result<(), AnyError> {
             unreachable!("snapshotting!")
         }
 
-        fn check_sys(&self, _kind: &str, _api_name: &str) -> Result<(), AnyError> {
+        fn check_sys(&mut self, _kind: &str, _api_name: &str) -> Result<(), AnyError> {
             unreachable!("snapshotting!")
         }
 
         fn check_write_with_api_name(
-            &self,
+            &mut self,
             _path: &Path,
             _api_name: Option<&str>,
         ) -> Result<(), AnyError> {
@@ -224,7 +225,11 @@ mod supabase_startup_snapshot {
             sb_core_net::init_ops_and_esm(),
             sb_core_http::init_ops_and_esm(),
             sb_core_http_start::init_ops_and_esm(),
-            deno_node::init_ops_and_esm::<Permissions>(None, fs),
+            deno_node::init_ops_and_esm::<Permissions>(None, None, fs),
+            // NOTE(kallebysantos):
+            // Full `Web Cache API` via `SqliteBackedCache` is disabled. Cache flow is
+            // handled by `sb_ai: Cache Adapter`
+            deno_cache::deno_cache::init_ops_and_esm::<SqliteBackedCache>(None),
             sb_core_runtime::init_ops_and_esm(None),
         ];
 

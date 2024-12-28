@@ -11,4 +11,3 @@ d2e-functions-old/
 
 scripts/*
 !scripts/install_onnx.sh
-!scripts/download_models.sh

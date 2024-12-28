@@ -1,12 +1,20 @@
-#[path = "../src/utils/integration_test_helper.rs"]
-mod integration_test_helper;
+#![allow(clippy::arc_with_non_send_sync)]
+#![allow(clippy::async_yields_async)]
+
+use deno_config::JsxImportSourceConfig;
+use graph::{emitter::EmitterFactory, generate_binary_eszip, EszipPayloadKind};
+use http_v02::{self as http, HeaderValue};
+use hyper_v014 as hyper;
+use reqwest_v011 as reqwest;
+use sb_event_worker::events::{LogLevel, WorkerEvents};
+use url::Url;
 
 use std::{
     borrow::Cow,
     collections::HashMap,
-    io::{self, Cursor},
+    io::{self, BufRead, Cursor},
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
 };
@@ -15,11 +23,17 @@ use anyhow::Context;
 use async_tungstenite::WebSocketStream;
 use base::{
     integration_test, integration_test_listen_fut, integration_test_with_server_flag,
-    rt_worker::worker_ctx::{create_user_worker_pool, create_worker, TerminationToken},
-    server::{ServerEvent, ServerFlags, ServerHealth, Tls},
-    DecoratorType,
+    server::{Server, ServerEvent, ServerFlags, ServerHealth, Tls},
+    worker, DecoratorType,
 };
-use deno_core::serde_json;
+use base::{
+    utils::test_utils::{
+        self, create_test_user_worker, test_user_runtime_opts, test_user_worker_pool_policy,
+        TestBedBuilder,
+    },
+    worker::TerminationToken,
+};
+use deno_core::serde_json::{self, json};
 use futures_util::{future::BoxFuture, Future, FutureExt, SinkExt, StreamExt};
 use http::{Method, Request, Response as HttpResponse, StatusCode};
 use http_utils::utils::get_upgrade_type;
@@ -37,6 +51,7 @@ use sb_workers::context::{
 use serde::Deserialize;
 use serial_test::serial;
 use tokio::{
+    fs,
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     join,
     net::TcpStream,
@@ -50,10 +65,6 @@ use tokio_rustls::{
 use tokio_util::{compat::TokioAsyncReadCompatExt, sync::CancellationToken};
 use tungstenite::Message;
 use urlencoding::encode;
-
-use crate::integration_test_helper::{
-    create_test_user_worker, test_user_runtime_opts, test_user_worker_pool_policy, TestBedBuilder,
-};
 
 const MB: usize = 1024 * 1024;
 const NON_SECURE_PORT: u16 = 8498;
@@ -174,39 +185,42 @@ async fn test_not_trigger_pku_sigsegv_due_to_jit_compilation_non_cli() {
     let main_termination_token = TerminationToken::new();
 
     // create a user worker pool
-    let (_, worker_pool_tx) = create_user_worker_pool(
-        integration_test_helper::test_user_worker_pool_policy(),
+    let (_, worker_pool_tx) = worker::create_user_worker_pool(
+        Arc::default(),
+        test_utils::test_user_worker_pool_policy(),
         None,
         Some(pool_termination_token.clone()),
         vec![],
-        None,
         None,
         None,
     )
     .await
     .unwrap();
 
-    let opts = WorkerContextInitOpts {
-        service_path: "./test_cases/slow_resp".into(),
-        no_module_cache: false,
-        import_map_path: None,
-        env_vars: HashMap::new(),
-        events_rx: None,
-        timing: None,
-        maybe_eszip: None,
-        maybe_entrypoint: None,
-        maybe_decorator: None,
-        maybe_module_code: None,
-        conf: WorkerRuntimeOpts::MainWorker(MainWorkerRuntimeOpts {
-            worker_pool_tx,
-            shared_metric_src: None,
-            event_worker_metric_src: None,
-        }),
-        static_patterns: vec![],
-        maybe_jsx_import_source_config: None,
-    };
+    let surface = worker::WorkerSurfaceBuilder::new()
+        .init_opts(WorkerContextInitOpts {
+            service_path: "./test_cases/slow_resp".into(),
+            no_module_cache: false,
+            import_map_path: None,
+            env_vars: HashMap::new(),
+            timing: None,
+            maybe_eszip: None,
+            maybe_entrypoint: None,
+            maybe_decorator: None,
+            maybe_module_code: None,
+            conf: WorkerRuntimeOpts::MainWorker(MainWorkerRuntimeOpts {
+                worker_pool_tx,
+                shared_metric_src: None,
+                event_worker_metric_src: None,
+            }),
+            static_patterns: vec![],
 
-    let ctx = create_worker((opts, main_termination_token.clone()), None, None)
+            maybe_jsx_import_source_config: None,
+            maybe_s3_fs_config: None,
+            maybe_tmp_fs_config: None,
+        })
+        .termination_token(main_termination_token.clone())
+        .build()
         .await
         .unwrap();
 
@@ -225,7 +239,7 @@ async fn test_not_trigger_pku_sigsegv_due_to_jit_compilation_non_cli() {
         conn_token: Some(conn_token.clone()),
     };
 
-    let _ = ctx.msg_tx.send(msg);
+    let _ = surface.msg_tx.send(msg);
 
     let res = res_rx.await.unwrap().unwrap();
     assert!(res.status().as_u16() == 200);
@@ -333,39 +347,43 @@ async fn test_main_worker_boot_error() {
     let main_termination_token = TerminationToken::new();
 
     // create a user worker pool
-    let (_, worker_pool_tx) = create_user_worker_pool(
+    let (_, worker_pool_tx) = worker::create_user_worker_pool(
+        Arc::default(),
         test_user_worker_pool_policy(),
         None,
         Some(pool_termination_token.clone()),
         vec![],
         None,
         None,
-        None,
     )
     .await
     .unwrap();
 
-    let opts = WorkerContextInitOpts {
-        service_path: "./test_cases/main".into(),
-        no_module_cache: false,
-        import_map_path: Some("./non-existing-import-map.json".to_string()),
-        env_vars: HashMap::new(),
-        events_rx: None,
-        timing: None,
-        maybe_eszip: None,
-        maybe_entrypoint: None,
-        maybe_decorator: None,
-        maybe_module_code: None,
-        conf: WorkerRuntimeOpts::MainWorker(MainWorkerRuntimeOpts {
-            worker_pool_tx,
-            shared_metric_src: None,
-            event_worker_metric_src: None,
-        }),
-        static_patterns: vec![],
-        maybe_jsx_import_source_config: None,
-    };
+    let result = worker::WorkerSurfaceBuilder::new()
+        .init_opts(WorkerContextInitOpts {
+            service_path: "./test_cases/main".into(),
+            no_module_cache: false,
+            import_map_path: Some("./non-existing-import-map.json".to_string()),
+            env_vars: HashMap::new(),
+            timing: None,
+            maybe_eszip: None,
+            maybe_entrypoint: None,
+            maybe_decorator: None,
+            maybe_module_code: None,
+            conf: WorkerRuntimeOpts::MainWorker(MainWorkerRuntimeOpts {
+                worker_pool_tx,
+                shared_metric_src: None,
+                event_worker_metric_src: None,
+            }),
+            static_patterns: vec![],
 
-    let result = create_worker((opts, main_termination_token.clone()), None, None).await;
+            maybe_jsx_import_source_config: None,
+            maybe_s3_fs_config: None,
+            maybe_tmp_fs_config: None,
+        })
+        .termination_token(main_termination_token.clone())
+        .build()
+        .await;
 
     assert!(result.is_err());
     assert!(result
@@ -459,39 +477,42 @@ async fn test_main_worker_user_worker_mod_evaluate_exception() {
     let main_termination_token = TerminationToken::new();
 
     // create a user worker pool
-    let (_, worker_pool_tx) = create_user_worker_pool(
+    let (_, worker_pool_tx) = worker::create_user_worker_pool(
+        Arc::default(),
         test_user_worker_pool_policy(),
         None,
         Some(pool_termination_token.clone()),
         vec![],
         None,
         None,
-        None,
     )
     .await
     .unwrap();
 
-    let opts = WorkerContextInitOpts {
-        service_path: "./test_cases/main".into(),
-        no_module_cache: false,
-        import_map_path: None,
-        env_vars: HashMap::new(),
-        events_rx: None,
-        timing: None,
-        maybe_eszip: None,
-        maybe_entrypoint: None,
-        maybe_decorator: None,
-        maybe_module_code: None,
-        conf: WorkerRuntimeOpts::MainWorker(MainWorkerRuntimeOpts {
-            worker_pool_tx,
-            shared_metric_src: None,
-            event_worker_metric_src: None,
-        }),
-        static_patterns: vec![],
-        maybe_jsx_import_source_config: None,
-    };
+    let surface = worker::WorkerSurfaceBuilder::new()
+        .init_opts(WorkerContextInitOpts {
+            service_path: "./test_cases/main".into(),
+            no_module_cache: false,
+            import_map_path: None,
+            env_vars: HashMap::new(),
+            timing: None,
+            maybe_eszip: None,
+            maybe_entrypoint: None,
+            maybe_decorator: None,
+            maybe_module_code: None,
+            conf: WorkerRuntimeOpts::MainWorker(MainWorkerRuntimeOpts {
+                worker_pool_tx,
+                shared_metric_src: None,
+                event_worker_metric_src: None,
+            }),
+            static_patterns: vec![],
 
-    let ctx = create_worker((opts, main_termination_token.clone()), None, None)
+            maybe_jsx_import_source_config: None,
+            maybe_s3_fs_config: None,
+            maybe_tmp_fs_config: None,
+        })
+        .termination_token(main_termination_token.clone())
+        .build()
         .await
         .unwrap();
 
@@ -510,7 +531,7 @@ async fn test_main_worker_user_worker_mod_evaluate_exception() {
         conn_token: Some(conn_token.clone()),
     };
 
-    let _ = ctx.msg_tx.send(msg);
+    let _ = surface.msg_tx.send(msg);
 
     let res = res_rx.await.unwrap().unwrap();
     assert!(res.status().as_u16() == 500);
@@ -859,7 +880,6 @@ async fn test_worker_boot_invalid_imports() {
         no_module_cache: false,
         import_map_path: None,
         env_vars: HashMap::new(),
-        events_rx: None,
         timing: None,
         maybe_eszip: None,
         maybe_entrypoint: None,
@@ -867,7 +887,10 @@ async fn test_worker_boot_invalid_imports() {
         maybe_module_code: None,
         conf: WorkerRuntimeOpts::UserWorker(test_user_runtime_opts()),
         static_patterns: vec![],
+
         maybe_jsx_import_source_config: None,
+        maybe_s3_fs_config: None,
+        maybe_tmp_fs_config: None,
     };
 
     let result = create_test_user_worker(opts).await;
@@ -881,17 +904,73 @@ async fn test_worker_boot_invalid_imports() {
 
 #[tokio::test]
 #[serial]
+async fn test_worker_boot_with_0_byte_eszip() {
+    let opts = WorkerContextInitOpts {
+        service_path: "./test_cases/meow".into(),
+        no_module_cache: false,
+        import_map_path: None,
+        env_vars: HashMap::new(),
+        timing: None,
+        maybe_eszip: Some(EszipPayloadKind::VecKind(vec![])),
+        maybe_entrypoint: Some("file:///src/index.ts".to_string()),
+        maybe_decorator: None,
+        maybe_module_code: None,
+        conf: WorkerRuntimeOpts::UserWorker(test_user_runtime_opts()),
+        static_patterns: vec![],
+
+        maybe_jsx_import_source_config: None,
+        maybe_s3_fs_config: None,
+        maybe_tmp_fs_config: None,
+    };
+
+    let result = create_test_user_worker(opts).await;
+
+    assert!(result.is_err());
+    assert!(format!("{:#}", result.unwrap_err())
+        .starts_with("worker boot error: unexpected end of file"));
+}
+
+#[tokio::test]
+#[serial]
+async fn test_worker_boot_with_invalid_entrypoint() {
+    let opts = WorkerContextInitOpts {
+        service_path: "./test_cases/meow".into(),
+        no_module_cache: false,
+        import_map_path: None,
+        env_vars: HashMap::new(),
+        timing: None,
+        maybe_eszip: None,
+        maybe_entrypoint: Some("file:///meow/mmmmeeeow.ts".to_string()),
+        maybe_decorator: None,
+        maybe_module_code: None,
+        conf: WorkerRuntimeOpts::UserWorker(test_user_runtime_opts()),
+        static_patterns: vec![],
+
+        maybe_jsx_import_source_config: None,
+        maybe_s3_fs_config: None,
+        maybe_tmp_fs_config: None,
+    };
+
+    let result = create_test_user_worker(opts).await;
+
+    assert!(result.is_err());
+    assert!(
+        format!("{:#}", result.unwrap_err()).starts_with("worker boot error: failed to read path")
+    );
+}
+
+#[tokio::test]
+#[serial]
 async fn req_failure_case_timeout() {
     let tb = TestBedBuilder::new("./test_cases/main")
         // NOTE: It should be small enough that the worker pool rejects the
         // request.
-        .with_oneshot_policy(10)
+        .with_oneshot_policy(Some(10))
         .build()
         .await;
 
-    let req_body_fn = || {
-        Request::builder()
-            .uri("/slow_resp")
+    let req_body_fn = |b: http::request::Builder| {
+        b.uri("/slow_resp")
             .method("GET")
             .body(Body::empty())
             .context("can't make request")
@@ -923,14 +1002,13 @@ async fn req_failure_case_timeout() {
 #[serial]
 async fn req_failure_case_cpu_time_exhausted() {
     let tb = TestBedBuilder::new("./test_cases/main_small_cpu_time")
-        .with_oneshot_policy(100000)
+        .with_oneshot_policy(None)
         .build()
         .await;
 
     let mut res = tb
-        .request(|| {
-            Request::builder()
-                .uri("/slow_resp")
+        .request(|b| {
+            b.uri("/slow_resp")
                 .method("GET")
                 .body(Body::empty())
                 .context("can't make request")
@@ -952,14 +1030,13 @@ async fn req_failure_case_cpu_time_exhausted() {
 #[serial]
 async fn req_failure_case_cpu_time_exhausted_2() {
     let tb = TestBedBuilder::new("./test_cases/main_small_cpu_time")
-        .with_oneshot_policy(100000)
+        .with_oneshot_policy(None)
         .build()
         .await;
 
     let mut res = tb
-        .request(|| {
-            Request::builder()
-                .uri("/cpu-sync")
+        .request(|b| {
+            b.uri("/cpu-sync")
                 .method("GET")
                 .body(Body::empty())
                 .context("can't make request")
@@ -981,14 +1058,13 @@ async fn req_failure_case_cpu_time_exhausted_2() {
 #[serial]
 async fn req_failure_case_wall_clock_reached() {
     let tb = TestBedBuilder::new("./test_cases/main_small_wall_clock")
-        .with_oneshot_policy(100000)
+        .with_oneshot_policy(None)
         .build()
         .await;
 
     let mut res = tb
-        .request(|| {
-            Request::builder()
-                .uri("/slow_resp")
+        .request(|b| {
+            b.uri("/slow_resp")
                 .method("GET")
                 .body(Body::empty())
                 .context("can't make request")
@@ -1011,14 +1087,13 @@ async fn req_failure_case_wall_clock_reached() {
 #[serial]
 async fn req_failture_case_memory_limit_1() {
     let tb = TestBedBuilder::new("./test_cases/main")
-        .with_oneshot_policy(100000)
+        .with_oneshot_policy(None)
         .build()
         .await;
 
     let mut res = tb
-        .request(|| {
-            Request::builder()
-                .uri("/array-alloc-sync")
+        .request(|b| {
+            b.uri("/array-alloc-sync")
                 .method("GET")
                 .body(Body::empty())
                 .context("can't make request")
@@ -1040,14 +1115,13 @@ async fn req_failture_case_memory_limit_1() {
 #[serial]
 async fn req_failture_case_memory_limit_2() {
     let tb = TestBedBuilder::new("./test_cases/main")
-        .with_oneshot_policy(100000)
+        .with_oneshot_policy(None)
         .build()
         .await;
 
     let mut res = tb
-        .request(|| {
-            Request::builder()
-                .uri("/array-alloc")
+        .request(|b| {
+            b.uri("/array-alloc")
                 .method("GET")
                 .body(Body::empty())
                 .context("can't make request")
@@ -1072,14 +1146,13 @@ async fn req_failure_case_wall_clock_reached_less_than_100ms() {
     // dozens of times on the local machine, it will fail with a timeout.
 
     let tb = TestBedBuilder::new("./test_cases/main_small_wall_clock_less_than_100ms")
-        .with_oneshot_policy(100000)
+        .with_oneshot_policy(None)
         .build()
         .await;
 
     let mut res = tb
-        .request(|| {
-            Request::builder()
-                .uri("/slow_resp")
+        .request(|b| {
+            b.uri("/slow_resp")
                 .method("GET")
                 .body(Body::empty())
                 .context("can't make request")
@@ -1174,7 +1247,7 @@ async fn req_failure_case_intentional_peer_reset_secure() {
 async fn req_failure_case_op_cancel_from_server_due_to_cpu_resource_limit() {
     test_oak_file_upload(
         Cow::Borrowed("./test_cases/main_small_cpu_time"),
-        48 * MB,
+        120 * MB,
         None,
         |resp| async {
             let res = resp.unwrap();
@@ -1252,7 +1325,11 @@ async fn test_oak_file_upload<F, R>(
     let original = RequestBuilder::from_parts(client, req);
     let request_builder = Some(original);
 
-    integration_test!(
+    integration_test_with_server_flag!(
+        ServerFlags {
+            request_buffer_size: Some(1024),
+            ..Default::default()
+        },
         main_service,
         NON_SECURE_PORT,
         "",
@@ -1485,7 +1562,7 @@ async fn test_decorators(ty: Option<DecoratorType>) {
                     .text()
                     .await
                     .unwrap()
-                    .starts_with("{\"msg\":\"InvalidWorkerCreation: worker boot error Uncaught SyntaxError: Invalid or unexpected token"),);
+                    .starts_with("{\"msg\":\"InvalidWorkerCreation: worker boot error: Uncaught SyntaxError: Invalid or unexpected token"),);
             } else {
                 assert_eq!(resp.status(), StatusCode::OK);
                 assert_eq!(resp.text().await.unwrap().as_str(), "meow?");
@@ -1493,11 +1570,6 @@ async fn test_decorators(ty: Option<DecoratorType>) {
         }),
         TerminationToken::new()
     );
-}
-
-#[derive(Deserialize)]
-struct ErrorResponsePayload {
-    msg: String,
 }
 
 #[tokio::test]
@@ -1522,14 +1594,13 @@ async fn test_decorator_parse_typescript_experimental_with_metadata() {
 #[serial]
 async fn send_partial_payload_into_closed_pipe_should_not_be_affected_worker_stability() {
     let tb = TestBedBuilder::new("./test_cases/main")
-        .with_oneshot_policy(100000)
+        .with_oneshot_policy(None)
         .build()
         .await;
 
     let mut resp1 = tb
-        .request(|| {
-            Request::builder()
-                .uri("/chunked-char-1000ms")
+        .request(|b| {
+            b.uri("/chunked-char-1000ms")
                 .method("GET")
                 .body(Body::empty())
                 .context("can't make request")
@@ -1552,9 +1623,8 @@ async fn send_partial_payload_into_closed_pipe_should_not_be_affected_worker_sta
     // of `Deno.serve` failing to properly handle an exception from a previous
     // request.
     let resp2 = tb
-        .request(|| {
-            Request::builder()
-                .uri("/empty-response")
+        .request(|b| {
+            b.uri("/empty-response")
                 .method("GET")
                 .body(Body::empty())
                 .context("can't make request")
@@ -1833,6 +1903,15 @@ async fn test_request_idle_timeout_no_streamed_response(maybe_tls: Option<Tls>) 
 #[serial]
 async fn test_request_idle_timeout_no_streamed_response_non_secure() {
     test_request_idle_timeout_no_streamed_response(new_localhost_tls(false)).await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "running too much tests"]
+async fn test_request_idle_timeout_no_streamed_response_non_secure_1000() {
+    for _ in 0..1000 {
+        test_request_idle_timeout_no_streamed_response(new_localhost_tls(false)).await;
+    }
 }
 
 #[tokio::test]
@@ -2212,6 +2291,1111 @@ async fn test_allow_net_fetch_google_com() {
         assert!(!payload.body.is_empty());
     })
     .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_fastify_v4_package() {
+    integration_test!(
+        "./test_cases/main",
+        NON_SECURE_PORT,
+        "fastify-v4",
+        None,
+        None,
+        None,
+        None,
+        (|resp| async {
+            assert_eq!(resp.unwrap().text().await.unwrap(), "meow");
+        }),
+        TerminationToken::new()
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn test_fastify_latest_package() {
+    integration_test!(
+        "./test_cases/main",
+        NON_SECURE_PORT,
+        "fastify-latest",
+        None,
+        None,
+        None,
+        None,
+        (|resp| async {
+            assert_eq!(resp.unwrap().text().await.unwrap(), "meow");
+        }),
+        TerminationToken::new()
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn test_declarative_style_fetch_handler() {
+    integration_test!(
+        "./test_cases/main",
+        NON_SECURE_PORT,
+        "serve-declarative-style",
+        None,
+        None,
+        None,
+        None,
+        (|resp| async {
+            assert_eq!(resp.unwrap().text().await.unwrap(), "meow");
+        }),
+        TerminationToken::new()
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn test_issue_420() {
+    integration_test!(
+        "./test_cases/main",
+        NON_SECURE_PORT,
+        "issue-420",
+        None,
+        None,
+        None,
+        None,
+        (|resp| async {
+            let text = resp.unwrap().text().await.unwrap();
+
+            assert!(text.starts_with("file:///"));
+            assert!(text.ends_with(
+                "/node_modules/localhost/@imagemagick/magick-wasm/0.0.30/dist/index.js"
+            ));
+        }),
+        TerminationToken::new()
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn test_issue_456() {
+    let tb = TestBedBuilder::new("./test_cases/main").build().await;
+    let resp = tb
+        .request(|b| {
+            b.uri("/issue-456")
+                .header("x-context-source-map", "true")
+                .body(Body::empty())
+                .context("can't make request")
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status().as_u16(), StatusCode::OK);
+    tb.exit(Duration::from_secs(TESTBED_DEADLINE_SEC)).await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_should_render_detailed_failed_to_create_graph_error() {
+    {
+        integration_test!(
+            "./test_cases/main",
+            NON_SECURE_PORT,
+            "graph-error-1",
+            None,
+            None,
+            None,
+            None,
+            (|resp| async {
+                let (payload, status) = ErrorResponsePayload::assert_error_response(resp).await;
+
+                assert_eq!(status, 500);
+                assert!(payload.msg.starts_with(
+                    "InvalidWorkerCreation: worker boot error: failed to create the graph: \
+                    Relative import path \"oak\" not prefixed with"
+                ));
+            }),
+            TerminationToken::new()
+        );
+    }
+
+    {
+        integration_test!(
+            "./test_cases/main",
+            NON_SECURE_PORT,
+            "graph-error-2",
+            None,
+            None,
+            None,
+            None,
+            (|resp| async {
+                let (payload, status) = ErrorResponsePayload::assert_error_response(resp).await;
+
+                assert_eq!(status, 500);
+                assert!(payload.msg.starts_with(
+                    "InvalidWorkerCreation: worker boot error: failed to create the graph: \
+                    Module not found \"file://"
+                ));
+            }),
+            TerminationToken::new()
+        );
+    }
+}
+
+#[tokio::test]
+#[serial]
+async fn test_js_entrypoint() {
+    {
+        integration_test!(
+            "./test_cases/main",
+            NON_SECURE_PORT,
+            "serve-js",
+            None,
+            None,
+            None,
+            None,
+            (|resp| async {
+                let resp = resp.unwrap();
+                assert_eq!(resp.status().as_u16(), 200);
+                let msg = resp.text().await.unwrap();
+                assert_eq!(msg, "meow");
+            }),
+            TerminationToken::new()
+        );
+    }
+
+    {
+        integration_test!(
+            "./test_cases/main",
+            NON_SECURE_PORT,
+            "serve-declarative-style-js",
+            None,
+            None,
+            None,
+            None,
+            (|resp| async {
+                let resp = resp.unwrap();
+                assert_eq!(resp.status().as_u16(), 200);
+                let msg = resp.text().await.unwrap();
+                assert_eq!(msg, "meow");
+            }),
+            TerminationToken::new()
+        );
+    }
+}
+
+#[tokio::test]
+#[serial]
+async fn test_should_be_able_to_bundle_against_various_exts() {
+    let get_eszip_buf = |path: &str| {
+        let path = path.to_string();
+        let mut emitter_factory = EmitterFactory::new();
+
+        emitter_factory.set_jsx_import_source(JsxImportSourceConfig {
+            default_specifier: Some("https://esm.sh/preact".to_string()),
+            default_types_specifier: None,
+            module: "jsx-runtime".to_string(),
+            base_url: Url::from_file_path(std::env::current_dir().unwrap()).unwrap(),
+        });
+
+        async {
+            generate_binary_eszip(
+                PathBuf::from(path),
+                Arc::new(emitter_factory),
+                None,
+                None,
+                None,
+            )
+            .await
+            .unwrap()
+            .into_bytes()
+        }
+    };
+
+    {
+        let buf = get_eszip_buf("./test_cases/eszip-various-ext/npm-supabase/index.js").await;
+
+        let client = Client::new();
+        let req = client
+            .request(
+                Method::POST,
+                format!("http://localhost:{}/meow", NON_SECURE_PORT),
+            )
+            .body(buf);
+
+        integration_test!(
+            "./test_cases/main_eszip",
+            NON_SECURE_PORT,
+            "",
+            None,
+            None,
+            Some(req),
+            None,
+            (|resp| async {
+                let resp = resp.unwrap();
+                assert_eq!(resp.status().as_u16(), 200);
+                let msg = resp.text().await.unwrap();
+                assert_eq!(msg, "function");
+            }),
+            TerminationToken::new()
+        );
+    }
+
+    let test_serve_simple_fn = |ext: &'static str, expected: &'static [u8]| {
+        let ext = ext.to_string();
+        let expected = expected.to_vec();
+
+        async move {
+            let buf = get_eszip_buf(&format!(
+                "./test_cases/eszip-various-ext/serve/index.{}",
+                ext
+            ))
+            .await;
+
+            let client = Client::new();
+            let req = client
+                .request(
+                    Method::POST,
+                    format!("http://localhost:{}/meow", NON_SECURE_PORT),
+                )
+                .body(buf);
+
+            integration_test!(
+                "./test_cases/main_eszip",
+                NON_SECURE_PORT,
+                "",
+                None,
+                None,
+                Some(req),
+                None,
+                (|resp| async move {
+                    let resp = resp.unwrap();
+                    assert_eq!(resp.status().as_u16(), 200);
+                    let msg = resp.bytes().await.unwrap();
+                    assert_eq!(msg, expected);
+                }),
+                TerminationToken::new()
+            );
+        }
+    };
+
+    test_serve_simple_fn("ts", b"meow").await;
+    test_serve_simple_fn("js", b"meow").await;
+    test_serve_simple_fn("mjs", b"meow").await;
+
+    static REACT_RESULT: &str = r#"{"type":"div","props":{"children":"meow"},"__k":null,"__":null,"__b":0,"__e":null,"__c":null,"__v":-1,"__i":-1,"__u":0}"#;
+
+    test_serve_simple_fn("jsx", REACT_RESULT.as_bytes()).await;
+    test_serve_simple_fn("tsx", REACT_RESULT.as_bytes()).await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_private_npm_package_import() {
+    // Required because test_cases/main_with_registry/registry/registry-handler.ts:58
+    std::env::set_var("EDGE_RUNTIME_PORT", NON_SECURE_PORT.to_string());
+    let _guard = scopeguard::guard((), |_| {
+        std::env::remove_var("EDGE_RUNTIME_PORT");
+    });
+
+    let client = Client::new();
+    let run_server_fn = |main: &'static str, token| async move {
+        let (tx, mut rx) = mpsc::channel(1);
+        let handle = tokio::task::spawn({
+            async move {
+                Server::new(
+                    "127.0.0.1",
+                    NON_SECURE_PORT,
+                    None,
+                    main.to_string(),
+                    None,
+                    None,
+                    None,
+                    None,
+                    Default::default(),
+                    Some(tx),
+                    Default::default(),
+                    Some(token),
+                    vec![],
+                    None,
+                    None,
+                    None,
+                )
+                .await
+                .unwrap()
+                .listen()
+                .await
+                .unwrap();
+            }
+        });
+
+        let _ev = loop {
+            match rx.recv().await {
+                Some(health) => break health.into_listening().unwrap(),
+                _ => continue,
+            }
+        };
+
+        handle
+    };
+
+    {
+        let token = TerminationToken::new();
+        let handle = run_server_fn("./test_cases/main_with_registry", token.clone()).await;
+
+        let resp = client
+            .request(
+                Method::GET,
+                format!(
+                    "http://localhost:{}/private-npm-package-import",
+                    NON_SECURE_PORT
+                ),
+            )
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body = resp.json::<serde_json::Value>().await.unwrap();
+        let body = body.as_object().unwrap();
+
+        assert_eq!(body.len(), 2);
+        assert_eq!(body.get("meow"), Some(&json!("function")));
+        assert_eq!(body.get("odd"), Some(&json!(true)));
+
+        token.cancel();
+        handle.await.unwrap();
+    }
+
+    {
+        let token = TerminationToken::new();
+        let handle = run_server_fn("./test_cases/main_with_registry", token.clone()).await;
+
+        let resp = client
+            .request(
+                Method::GET,
+                format!("http://localhost:{}/meow", NON_SECURE_PORT),
+            )
+            .header("x-service-path", "private-npm-package-import-2/inner")
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body = resp.json::<serde_json::Value>().await.unwrap();
+        let body = body.as_object().unwrap();
+
+        assert_eq!(body.len(), 2);
+        assert_eq!(body.get("meow"), Some(&json!("function")));
+        assert_eq!(body.get("odd"), Some(&json!(true)));
+
+        token.cancel();
+        handle.await.unwrap();
+    }
+
+    {
+        let token = TerminationToken::new();
+        let handle = run_server_fn("./test_cases/main_eszip", token.clone()).await;
+
+        let buf = {
+            let mut emitter_factory = EmitterFactory::new();
+
+            emitter_factory.set_npmrc_path("./test_cases/private-npm-package-import/.npmrc");
+
+            generate_binary_eszip(
+                PathBuf::from("./test_cases/private-npm-package-import/index.js"),
+                Arc::new(emitter_factory),
+                None,
+                None,
+                None,
+            )
+            .await
+            .unwrap()
+            .into_bytes()
+        };
+
+        let resp = client
+            .request(
+                Method::POST,
+                format!("http://localhost:{}/meow", NON_SECURE_PORT),
+            )
+            .body(buf)
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body = resp.json::<serde_json::Value>().await.unwrap();
+        let body = body.as_object().unwrap();
+
+        assert_eq!(body.len(), 2);
+        assert_eq!(body.get("meow"), Some(&json!("function")));
+        assert_eq!(body.get("odd"), Some(&json!(true)));
+
+        token.cancel();
+        handle.await.unwrap();
+    }
+}
+
+#[tokio::test]
+#[serial]
+async fn test_tmp_fs_usage() {
+    {
+        integration_test!(
+            "./test_cases/main",
+            NON_SECURE_PORT,
+            "use-tmp-fs",
+            None,
+            None,
+            None,
+            None,
+            (|resp| async {
+                let resp = resp.unwrap();
+
+                assert_eq!(resp.status().as_u16(), 200);
+
+                let body = resp.json::<serde_json::Value>().await.unwrap();
+                let body = body.as_object().unwrap();
+
+                assert_eq!(body.len(), 4);
+                assert_eq!(body.get("written"), Some(&json!(8)));
+                assert_eq!(body.get("content"), Some(&json!("meowmeow")));
+                assert_eq!(body.get("deleted"), Some(&json!(true)));
+
+                let steps = body.get("steps").unwrap().as_array().unwrap();
+
+                assert_eq!(&steps[0], &json!(true));
+                assert_eq!(&steps[1], &json!(false));
+            }),
+            TerminationToken::new()
+        );
+    }
+
+    {
+        integration_test!(
+            "./test_cases/main",
+            NON_SECURE_PORT,
+            "use-tmp-fs-2",
+            None,
+            None,
+            None,
+            None,
+            (|resp| async {
+                let resp = resp.unwrap();
+
+                assert_eq!(resp.status().as_u16(), 200);
+
+                let body = resp.json::<serde_json::Value>().await.unwrap();
+                let body = body.as_object().unwrap();
+
+                assert_eq!(body.len(), 2);
+                assert_eq!(body.get("hadExisted"), Some(&json!(true)));
+
+                let path = body.get("path").unwrap().as_str().unwrap();
+                let f = fs::read(path).await.unwrap();
+                let mut cursor = Cursor::new(&f);
+
+                let client = Client::new();
+                let resp2 = client
+                    .request(Method::GET, "https://httpbin.org/stream/20".to_string())
+                    .send()
+                    .await
+                    .unwrap();
+
+                assert_eq!(resp2.status().as_u16(), 200);
+
+                let body2 = resp2.bytes().await.unwrap();
+                let mut cursor2 = Cursor::new(&*body2);
+                let mut count = 0;
+
+                loop {
+                    use serde_json::*;
+
+                    let mut buf = String::new();
+
+                    cursor.read_line(&mut buf).unwrap();
+                    let mut msg = from_str::<Map<String, Value>>(&buf).unwrap();
+
+                    buf.clear();
+                    cursor2.read_line(&mut buf).unwrap();
+                    let mut msg2 = from_str::<Map<String, Value>>(&buf).unwrap();
+
+                    assert!(msg.remove("headers").is_some());
+                    assert!(msg2.remove("headers").is_some());
+                    assert_eq!(msg, msg2);
+
+                    count += 1;
+                    if count >= 20 {
+                        break;
+                    }
+                }
+            }),
+            TerminationToken::new()
+        );
+    }
+}
+
+#[tokio::test]
+#[serial]
+async fn test_tmp_fs_should_not_be_available_in_import_stmt() {
+    // The s3 fs and tmp fs are not currently attached to the module loader, so the import statement
+    // should not recognize their prefixes. (But, depending on the case, they may be attached in the
+    // future)
+    integration_test!(
+        "./test_cases/main",
+        NON_SECURE_PORT,
+        "use-tmp-fs-in-import-stmt",
+        None,
+        None,
+        None,
+        None,
+        (|resp| async {
+            let (payload, status) = ErrorResponsePayload::assert_error_response(resp).await;
+
+            assert_eq!(status, 500);
+            dbg!(&payload.msg);
+            assert!(payload.msg.starts_with(
+                "InvalidWorkerResponse: event loop error while evaluating the module: \
+                TypeError: Module not found: file:///tmp/meowmeow.ts"
+            ));
+        }),
+        TerminationToken::new()
+    );
+}
+
+// -- sb_ai: ORT @huggingface/transformers
+async fn test_ort_transformers_js(script_path: &str) {
+    fn visit_json(value: &mut serde_json::Value) {
+        use serde_json::Number;
+        use serde_json::Value::*;
+
+        match value {
+            Array(vec) => {
+                for v in vec {
+                    visit_json(v);
+                }
+            }
+            Object(map) => {
+                for (_, v) in map {
+                    visit_json(v);
+                }
+            }
+            Number(number) => {
+                if let Some(f) = number.as_f64() {
+                    *number = Number::from_f64((f * 1_000_000.0).round() / 1_000_000.0).unwrap();
+                }
+            }
+
+            _ => {}
+        }
+    }
+
+    use std::env::consts;
+
+    let base_path = "./test_cases/ai-ort-rust-backend";
+    let main_path = format!("{}/main", base_path);
+    let script_path = format!("transformers-js/{}", script_path);
+    let snapshot_path = PathBuf::from(base_path)
+        .join(script_path.as_str())
+        .join(format!("__snapshot__/{}_{}.json", consts::OS, consts::ARCH));
+
+    let client = Client::new();
+    let body = {
+        if snapshot_path.exists() {
+            tokio::fs::read(&snapshot_path).await.unwrap()
+        } else {
+            b"null".to_vec()
+        }
+    };
+
+    let content_length = body.len();
+    let req = client
+        .request(
+            Method::POST,
+            format!(
+                "http://localhost:{}/{}",
+                NON_SECURE_PORT,
+                script_path.as_str(),
+            ),
+        )
+        .body(body)
+        .header("Content-Type", "application/json")
+        .header("Content-Length", content_length.to_string());
+
+    integration_test!(
+        main_path,
+        NON_SECURE_PORT,
+        "",
+        None,
+        None,
+        Some(req),
+        None,
+        (|resp| async {
+            let res = resp.unwrap();
+            let status_code = res.status();
+
+            assert!(matches!(status_code, StatusCode::OK | StatusCode::CREATED));
+
+            if status_code == StatusCode::OK {
+                return;
+            }
+
+            assert_eq!(std::env::var("CI").ok(), None);
+            assert!(!snapshot_path.exists());
+
+            tokio::fs::create_dir_all(snapshot_path.parent().unwrap())
+                .await
+                .unwrap();
+
+            let mut body = res.json::<serde_json::Value>().await.unwrap();
+            let mut file = fs::File::create(&snapshot_path).await.unwrap();
+
+            visit_json(&mut body);
+
+            let content = serde_json::to_vec(&body).unwrap();
+
+            file.write_all(&content).await.unwrap();
+        }),
+        TerminationToken::new()
+    );
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_nlp_feature_extraction() {
+    test_ort_transformers_js("feature-extraction").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_nlp_fill_mask() {
+    test_ort_transformers_js("fill-mask").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_nlp_question_answering() {
+    test_ort_transformers_js("question-answering").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_nlp_summarization() {
+    test_ort_transformers_js("summarization").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_nlp_text_classification() {
+    test_ort_transformers_js("text-classification").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_nlp_text_generation() {
+    test_ort_transformers_js("text-generation").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_nlp_text2text_generation() {
+    test_ort_transformers_js("text2text-generation").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_nlp_token_classification() {
+    test_ort_transformers_js("token-classification").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_nlp_translation() {
+    test_ort_transformers_js("translation").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_nlp_zero_shot_classification() {
+    test_ort_transformers_js("zero-shot-classification").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_vision_image_feature_extraction() {
+    test_ort_transformers_js("image-feature-extraction").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_vision_image_classification() {
+    test_ort_transformers_js("image-classification").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_vision_zero_shot_image_classification() {
+    test_ort_transformers_js("zero-shot-image-classification").await;
+}
+
+// -- sb_ai(cache): ORT @huggingface/transformers
+#[tokio::test]
+#[serial]
+async fn test_ort_cache_nlp_feature_extraction() {
+    test_ort_transformers_js("feature-extraction-cache").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_cache_nlp_fill_mask() {
+    test_ort_transformers_js("fill-mask-cache").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_cache_nlp_question_answering() {
+    test_ort_transformers_js("question-answering-cache").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_cache_nlp_summarization() {
+    test_ort_transformers_js("summarization-cache").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_cache_nlp_text_classification() {
+    test_ort_transformers_js("text-classification-cache").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_cache_nlp_text_generation() {
+    test_ort_transformers_js("text-generation-cache").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_cache_nlp_text2text_generation() {
+    test_ort_transformers_js("text2text-generation-cache").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_cache_nlp_token_classification() {
+    test_ort_transformers_js("token-classification-cache").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_cache_nlp_translation() {
+    test_ort_transformers_js("translation-cache").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_cache_nlp_zero_shot_classification() {
+    test_ort_transformers_js("zero-shot-classification-cache").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_cache_vision_image_feature_extraction() {
+    test_ort_transformers_js("image-feature-extraction-cache").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_cache_vision_image_classification() {
+    test_ort_transformers_js("image-classification-cache").await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_ort_cache_vision_zero_shot_image_classification() {
+    test_ort_transformers_js("zero-shot-image-classification-cache").await;
+}
+
+async fn test_runtime_beforeunload_event(kind: &'static str, pct: u8) {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let tb = TestBedBuilder::new("./test_cases/runtime-event")
+        .with_per_worker_policy(None)
+        .with_worker_event_sender(Some(tx))
+        .with_server_flags(ServerFlags {
+            beforeunload_wall_clock_pct: Some(pct),
+            beforeunload_cpu_pct: Some(pct),
+            beforeunload_memory_pct: Some(pct),
+            ..Default::default()
+        })
+        .build()
+        .await;
+
+    let resp = tb
+        .request(|b| {
+            b.uri(format!("/{}", kind))
+                .method("GET")
+                .body(Body::empty())
+                .context("can't make request")
+        })
+        .await
+        .unwrap();
+
+    assert_ne!(resp.status().as_u16(), StatusCode::OK);
+
+    tb.exit(Duration::from_secs(TESTBED_DEADLINE_SEC)).await;
+
+    while let Some(ev) = rx.recv().await {
+        let WorkerEvents::Log(ev) = ev.event else {
+            continue;
+        };
+        if ev.level != LogLevel::Info {
+            continue;
+        }
+        if ev
+            .msg
+            .contains(&format!("triggered {}", kind.replace('-', "_")))
+        {
+            return;
+        }
+    }
+
+    unreachable!("test failed");
+}
+
+#[tokio::test]
+#[serial]
+async fn test_runtime_event_beforeunload_cpu() {
+    test_runtime_beforeunload_event("cpu", 50).await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_runtime_event_beforeunload_wall_clock() {
+    test_runtime_beforeunload_event("wall-clock", 50).await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_runtime_event_beforeunload_mem() {
+    test_runtime_beforeunload_event("mem", 50).await;
+}
+
+// NOTE(Nyannyacha): We cannot enable this test unless we clarify the trigger point of the unload
+// event.
+//
+// #[tokio::test]
+// #[serial]
+// async fn test_runtime_event_unload() {
+//     let (tx, mut rx) = mpsc::unbounded_channel();
+//     let tb = TestBedBuilder::new("./test_cases/runtime-event")
+//         .with_per_worker_policy(None)
+//         .with_worker_event_sender(Some(tx))
+//         .build()
+//         .await;
+//
+//     let resp = tb
+//         .request(|b| {
+//             b.uri("/unload")
+//                 .method("GET")
+//                 .body(Body::empty())
+//                 .context("can't make request")
+//         })
+//         .await
+//         .unwrap();
+//
+//     assert_eq!(resp.status().as_u16(), StatusCode::OK);
+//
+//     sleep(Duration::from_secs(8)).await;
+//     tb.exit(Duration::from_secs(TESTBED_DEADLINE_SEC)).await;
+//
+//     while let Some(ev) = rx.recv().await {
+//         let WorkerEvents::Log(ev) = ev.event else {
+//             continue;
+//         };
+//         if ev.level != LogLevel::Info {
+//             continue;
+//         }
+//         if ev.msg.contains("triggered unload") {
+//             break;
+//         }
+//     }
+//
+//     unreachable!("test failed");
+// }
+
+#[tokio::test]
+#[serial]
+async fn test_should_wait_for_background_tests() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let tb = TestBedBuilder::new("./test_cases/main")
+        // only the `per_worker` policy allows waiting for background tasks.
+        .with_per_worker_policy(None)
+        .with_worker_event_sender(Some(tx))
+        .build()
+        .await;
+
+    let resp = tb
+        .request(|b| {
+            b.uri("/mark-background-task")
+                .header("x-cpu-time-soft-limit-ms", HeaderValue::from_static("100"))
+                .body(Body::empty())
+                .context("can't make request")
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status().as_u16(), StatusCode::OK);
+
+    tb.exit(Duration::from_secs(TESTBED_DEADLINE_SEC)).await;
+
+    while let Some(ev) = rx.recv().await {
+        let WorkerEvents::Log(ev) = ev.event else {
+            continue;
+        };
+        if ev.level != LogLevel::Info {
+            continue;
+        }
+        if ev.msg.contains("meow") {
+            return;
+        }
+    }
+
+    unreachable!("test failed");
+}
+
+#[tokio::test]
+#[serial]
+async fn test_should_not_wait_for_background_tests() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let tb = TestBedBuilder::new("./test_cases/main")
+        // only the `per_worker` policy allows waiting for background tasks.
+        .with_per_worker_policy(None)
+        .with_worker_event_sender(Some(tx))
+        .build()
+        .await;
+
+    let resp = tb
+        .request(|b| {
+            b.uri("/mark-background-task-2")
+                .header("x-cpu-time-soft-limit-ms", HeaderValue::from_static("100"))
+                .body(Body::empty())
+                .context("can't make request")
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status().as_u16(), StatusCode::OK);
+
+    tb.exit(Duration::from_secs(TESTBED_DEADLINE_SEC)).await;
+
+    while let Some(ev) = rx.recv().await {
+        let WorkerEvents::Log(ev) = ev.event else {
+            continue;
+        };
+        if ev.level != LogLevel::Info {
+            continue;
+        }
+        if ev.msg.contains("meow") {
+            unreachable!("test failed");
+        }
+    }
+}
+
+#[tokio::test]
+#[serial]
+async fn test_should_be_able_to_trigger_early_drop_with_wall_clock() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let tb = TestBedBuilder::new("./test_cases/main")
+        .with_per_worker_policy(None)
+        .with_worker_event_sender(Some(tx))
+        .build()
+        .await;
+
+    let resp = tb
+        .request(|b| {
+            b.uri("/early-drop-wall-clock")
+                .header("x-worker-timeout-ms", HeaderValue::from_static("3000"))
+                .body(Body::empty())
+                .context("can't make request")
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status().as_u16(), StatusCode::OK);
+
+    sleep(Duration::from_secs(2)).await;
+    rx.close();
+    tb.exit(Duration::from_secs(TESTBED_DEADLINE_SEC)).await;
+
+    while let Some(ev) = rx.recv().await {
+        let WorkerEvents::Log(ev) = ev.event else {
+            continue;
+        };
+        if ev.level != LogLevel::Info {
+            continue;
+        }
+        if ev.msg.contains("early_drop") {
+            return;
+        }
+    }
+
+    unreachable!("test failed");
+}
+
+#[tokio::test]
+#[serial]
+async fn test_should_be_able_to_trigger_early_drop_with_mem() {
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let tb = TestBedBuilder::new("./test_cases/main")
+        .with_per_worker_policy(None)
+        .with_worker_event_sender(Some(tx))
+        .build()
+        .await;
+
+    let resp = tb
+        .request(|b| {
+            b.uri("/early-drop-mem")
+                .header("x-memory-limit-mb", HeaderValue::from_static("20"))
+                .body(Body::empty())
+                .context("can't make request")
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status().as_u16(), StatusCode::OK);
+
+    sleep(Duration::from_secs(2)).await;
+    rx.close();
+    tb.exit(Duration::from_secs(TESTBED_DEADLINE_SEC)).await;
+
+    while let Some(ev) = rx.recv().await {
+        let WorkerEvents::Log(ev) = ev.event else {
+            continue;
+        };
+        if ev.level != LogLevel::Info {
+            continue;
+        }
+        if ev.msg.contains("early_drop") {
+            return;
+        }
+    }
+
+    unreachable!("test failed");
+}
+
+#[derive(Deserialize)]
+struct ErrorResponsePayload {
+    msg: String,
+}
+
+impl ErrorResponsePayload {
+    async fn assert_error_response(resp: Result<Response, reqwest::Error>) -> (Self, u16) {
+        let res = resp.unwrap();
+        let status = res.status().as_u16();
+        let res = res.json::<Self>().await;
+
+        assert!(res.is_ok());
+
+        (res.unwrap(), status)
+    }
 }
 
 trait AsyncReadWrite: AsyncRead + AsyncWrite + Send + Unpin {}

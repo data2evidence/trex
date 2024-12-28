@@ -1,52 +1,72 @@
 use crate::inspector_server::Inspector;
-use crate::rt_worker::supervisor::{CPUUsage, CPUUsageMetrics};
-use crate::rt_worker::worker::DuplexStreamEntry;
-use crate::utils::units::{bytes_to_display, mib_to_bytes};
+use crate::utils::json;
+use crate::utils::path::find_up;
+use crate::utils::units::{bytes_to_display, mib_to_bytes, percentage_value};
+use crate::worker::supervisor::{CPUUsage, CPUUsageMetrics};
+use crate::worker::{DuplexStreamEntry, Worker};
 
 use anyhow::{anyhow, bail, Context, Error};
+use arc_swap::ArcSwapOption;
 use base_mem_check::{MemCheckState, WorkerHeapStatistics};
+use base_rt::{get_current_cpu_time_ns, BlockingScopeCPUUsage};
+use base_rt::{DenoRuntimeDropToken, DropToken};
 use cooked_waker::{IntoWaker, WakeRef};
-use cpu_timer::get_thread_time;
 use ctor::ctor;
-use deno_core::error::AnyError;
+use deno_cache::SqliteBackedCache;
+use deno_core::error::{AnyError, JsError};
+use deno_core::unsync::AtomicFlag;
 use deno_core::url::Url;
-use deno_core::v8::{GCCallbackFlags, GCType, HeapStatistics, Isolate};
+use deno_core::v8::{self, GCCallbackFlags, GCType, HeapStatistics, Isolate};
 use deno_core::{
-    located_script_name, serde_json, JsRuntime, ModuleCodeString, ModuleId, PollEventLoopOptions,
-    RuntimeOptions,
+    serde_json, JsRuntime, ModuleId, ModuleLoader, ModuleSpecifier, OpState, PollEventLoopOptions,
+    ResolutionKind, RuntimeOptions,
 };
 use deno_http::DefaultHttpPropertyExtractor;
 use deno_tls::deno_native_certs::load_native_certs;
-use deno_tls::rustls;
 use deno_tls::rustls::RootCertStore;
 use deno_tls::RootCertStoreProvider;
+use fs::prefix_fs::PrefixFs;
+use fs::s3_fs::S3Fs;
+use fs::static_fs::StaticFs;
+use fs::tmp_fs::TmpFs;
 use futures_util::future::poll_fn;
 use futures_util::task::AtomicWaker;
-use log::{error, trace};
+use futures_util::FutureExt;
+use log::error;
 use once_cell::sync::{Lazy, OnceCell};
-use sb_core::conn_sync::DenoRuntimeDropToken;
 use sb_core::http::sb_core_http;
 use sb_core::http_start::sb_core_http_start;
 use sb_core::util::sync::AtomicFlag;
 // use sb_fs::static_fs::StaticFs;
+use scopeguard::ScopeGuard;
 use serde::Serialize;
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::c_void;
 use std::fmt;
+use std::future::Future;
 use std::marker::PhantomData;
+use std::mem::ManuallyDrop;
+use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::task::Poll;
+use std::thread::ThreadId;
 use std::time::Duration;
-use tokio::sync::mpsc;
+use strum::IntoStaticStr;
+use tokio::sync::{mpsc, OwnedSemaphorePermit, Semaphore};
 use tokio::time::interval;
-use tokio_util::sync::CancellationToken;
+use tokio_util::sync::{CancellationToken, PollSemaphore};
+use tracing::{debug, debug_span, instrument, trace, Instrument};
 
 use crate::snapshot;
-use event_worker::events::{EventMetadata, WorkerEventWithMetadata};
-use event_worker::js_interceptors::sb_events_js_interceptors;
-use event_worker::sb_user_event_worker;
+use fs::deno_compile_fs::DenoCompileFileSystem;
+use graph::emitter::EmitterFactory;
+use graph::import_map::load_import_map;
+use graph::{generate_binary_eszip, include_glob_patterns_in_eszip, EszipPayloadKind};
+use module_loader::standalone::create_module_loader_for_standalone_from_eszip_kind;
+use module_loader::RuntimeProviders;
 use sb_ai::sb_ai;
 use sb_core::cache::CacheSetting;
 use sb_core::cert::ValueRootCertStoreProvider;
@@ -54,14 +74,11 @@ use sb_core::external_memory::CustomAllocator;
 use sb_core::net::sb_core_net;
 use sb_core::permissions::{sb_core_permissions, Permissions};
 use sb_core::runtime::sb_core_runtime;
-use sb_core::{sb_core_main_js, MemCheckWaker};
+use sb_core::{sb_core_main_js, MemCheckWaker, PromiseMetrics};
 use sb_env::sb_env as sb_env_op;
-use sb_fs::file_system::DenoCompileFileSystem;
-use sb_graph::emitter::EmitterFactory;
-use sb_graph::import_map::load_import_map;
-use sb_graph::{generate_binary_eszip, include_glob_patterns_in_eszip, EszipPayloadKind};
-use sb_module_loader::standalone::create_module_loader_for_standalone_from_eszip_kind;
-use sb_module_loader::RuntimeProviders;
+use sb_event_worker::events::{EventMetadata, WorkerEventWithMetadata};
+use sb_event_worker::js_interceptors::sb_events_js_interceptors;
+use sb_event_worker::sb_user_event_worker;
 use sb_node::deno_node;
 use sb_workers::context::{UserWorkerMsgs, WorkerContextInitOpts, WorkerRuntimeOpts};
 use sb_workers::sb_user_workers;
@@ -91,6 +108,15 @@ pub static SHOULD_DISABLE_DEPRECATED_API_WARNING: OnceCell<bool> = OnceCell::new
 pub static SHOULD_USE_VERBOSE_DEPRECATED_API_WARNING: OnceCell<bool> = OnceCell::new();
 pub static SHOULD_INCLUDE_MALLOCED_MEMORY_ON_MEMCHECK: OnceCell<bool> = OnceCell::new();
 pub static MAYBE_DENO_VERSION: OnceCell<String> = OnceCell::new();
+
+thread_local! {
+    // NOTE: Suppose we have met `.await` points while initializing a
+    // DenoRuntime. In that case, the current v8 isolate's thread-local state can be
+    // corrupted by a task initializing another DenoRuntime, so we must prevent this
+    // with a Semaphore.
+
+    static RUNTIME_CREATION_SEM: Arc<Semaphore> = Arc::new(Semaphore::new(1));
+}
 
 #[ctor]
 fn init_v8_platform() {
@@ -171,49 +197,225 @@ impl MemCheck {
             }
         }
 
+        trace!(malloced_mb = bytes_to_display(total_bytes as u64));
         total_bytes
+    }
+
+    fn is_exceeded(&self) -> bool {
+        self.exceeded_token.is_cancelled()
     }
 }
 
 pub trait GetRuntimeContext {
-    fn get_runtime_context() -> impl Serialize;
-}
+    fn get_runtime_context(
+        conf: &WorkerRuntimeOpts,
+        use_inspector: bool,
+        version: Option<&str>,
+    ) -> impl Serialize {
+        serde_json::json!({
+            "target": env!("TARGET"),
+            "kind": conf.to_worker_kind().to_string(),
+            "debug": cfg!(debug_assertions),
+            "inspector": use_inspector,
+            "version": {
+                "runtime": version.unwrap_or("0.1.0"),
+                "deno": MAYBE_DENO_VERSION
+                    .get()
+                    .map(|it| &**it)
+                    .unwrap_or("UNKNOWN"),
+            },
+            "flags": {
+                "SHOULD_DISABLE_DEPRECATED_API_WARNING": SHOULD_DISABLE_DEPRECATED_API_WARNING
+                    .get()
+                    .copied()
+                    .unwrap_or_default(),
+                "SHOULD_USE_VERBOSE_DEPRECATED_API_WARNING": SHOULD_USE_VERBOSE_DEPRECATED_API_WARNING
+                    .get()
+                    .copied()
+                    .unwrap_or_default()
+            }
+        })
+    }
 
-impl GetRuntimeContext for () {
-    fn get_runtime_context() -> impl Serialize {
-        serde_json::json!(null)
+    fn get_extra_context() -> impl Serialize {
+        serde_json::json!({})
     }
 }
 
-pub struct DenoRuntime<RuntimeContext = ()> {
+type DefaultRuntimeContext = ();
+
+impl GetRuntimeContext for DefaultRuntimeContext {}
+
+#[derive(Debug, Clone)]
+struct GlobalMainContext(v8::Global<v8::Context>);
+
+impl GlobalMainContext {
+    fn to_local_context<'s>(
+        &self,
+        scope: &mut v8::HandleScope<'s, ()>,
+    ) -> v8::Local<'s, v8::Context> {
+        v8::Local::new(scope, &self.0)
+    }
+}
+
+struct DispatchEventFunctions {
+    dispatch_load_event_fn_global: v8::Global<v8::Function>,
+    dispatch_beforeunload_event_fn_global: v8::Global<v8::Function>,
+    dispatch_unload_event_fn_global: v8::Global<v8::Function>,
+    dispatch_drain_event_fn_global: v8::Global<v8::Function>,
+}
+
+#[derive(IntoStaticStr, Debug, Clone, Copy)]
+#[strum(serialize_all = "snake_case")]
+pub enum WillTerminateReason {
+    CPU,
+    Memory,
+    WallClock,
+    EarlyDrop,
+    Termination,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct RuntimeState {
+    pub evaluating_mod: Arc<AtomicFlag>,
+    pub event_loop_completed: Arc<AtomicFlag>,
+    pub terminated: Arc<AtomicFlag>,
+    pub found_inspector_session: Arc<AtomicFlag>,
+    pub mem_reached_half: Arc<AtomicFlag>,
+}
+
+impl RuntimeState {
+    pub fn is_evaluating_mod(&self) -> bool {
+        self.evaluating_mod.is_raised()
+    }
+
+    pub fn is_event_loop_completed(&self) -> bool {
+        self.event_loop_completed.is_raised()
+    }
+
+    pub fn is_terminated(&self) -> bool {
+        self.terminated.is_raised()
+    }
+
+    pub fn is_found_inspector_session(&self) -> bool {
+        self.found_inspector_session.is_raised()
+    }
+}
+
+#[derive(Debug)]
+pub struct RunOptions {
+    wait_termination_request_token: bool,
+    duplex_stream_rx: mpsc::UnboundedReceiver<DuplexStreamEntry>,
+    maybe_cpu_usage_metrics_tx: Option<mpsc::UnboundedSender<CPUUsageMetrics>>,
+}
+
+pub struct RunOptionsBuilder {
+    wait_termination_request_token: bool,
+    duplex_stream_rx: Option<mpsc::UnboundedReceiver<DuplexStreamEntry>>,
+    maybe_cpu_usage_metrics_tx: Option<mpsc::UnboundedSender<CPUUsageMetrics>>,
+}
+
+impl Default for RunOptionsBuilder {
+    fn default() -> Self {
+        Self {
+            wait_termination_request_token: true,
+            duplex_stream_rx: None,
+            maybe_cpu_usage_metrics_tx: None,
+        }
+    }
+}
+
+impl RunOptionsBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn wait_termination_request_token(mut self, val: bool) -> Self {
+        self.wait_termination_request_token = val;
+        self
+    }
+
+    pub fn stream_rx(mut self, val: mpsc::UnboundedReceiver<DuplexStreamEntry>) -> Self {
+        self.duplex_stream_rx = Some(val);
+        self
+    }
+
+    pub fn cpu_usage_metrics_tx(
+        mut self,
+        val: Option<mpsc::UnboundedSender<CPUUsageMetrics>>,
+    ) -> Self {
+        self.maybe_cpu_usage_metrics_tx = val;
+        self
+    }
+
+    pub fn build(self) -> Result<RunOptions, AnyError> {
+        let Self {
+            wait_termination_request_token,
+            duplex_stream_rx,
+            maybe_cpu_usage_metrics_tx,
+        } = self;
+
+        // TODO(Nyannyacha): Make this as optional.
+        let Some(duplex_stream_rx) = duplex_stream_rx else {
+            return Err(anyhow!("stream_rx can't be empty"));
+        };
+
+        Ok(RunOptions {
+            wait_termination_request_token,
+            duplex_stream_rx,
+            maybe_cpu_usage_metrics_tx,
+        })
+    }
+}
+
+pub struct DenoRuntime<RuntimeContext = DefaultRuntimeContext> {
+    pub runtime_state: Arc<RuntimeState>,
+    pub js_runtime: ManuallyDrop<JsRuntime>,
+
     pub drop_token: CancellationToken,
-    pub js_runtime: JsRuntime,
+    pub(crate) termination_request_token: CancellationToken,
+
     pub env_vars: HashMap<String, String>, // TODO: does this need to be pub?
     pub conf: WorkerRuntimeOpts,
-
-    pub(crate) is_termination_requested: Arc<AtomicFlag>,
-    pub(crate) is_terminated: Arc<AtomicFlag>,
-    pub(crate) is_found_inspector_session: Arc<AtomicFlag>,
+    pub s3_fs: Option<S3Fs>,
 
     main_module_id: ModuleId,
-    maybe_inspector: Option<Inspector>,
+    worker: Worker,
+    promise_metrics: PromiseMetrics,
 
     mem_check: Arc<MemCheck>,
     waker: Arc<AtomicWaker>,
+
+    beforeunload_mem_threshold: Arc<ArcSwapOption<u64>>,
+    beforeunload_cpu_threshold: Arc<ArcSwapOption<u64>>,
 
     _phantom_runtime_context: PhantomData<RuntimeContext>,
 }
 
 impl<RuntimeContext> Drop for DenoRuntime<RuntimeContext> {
     fn drop(&mut self) {
-        self.drop_token.cancel();
-
         if self.conf.is_user_worker() {
             self.js_runtime.v8_isolate().remove_gc_prologue_callback(
                 mem_check_gc_prologue_callback_fn,
                 Arc::as_ptr(&self.mem_check) as *mut _,
             );
         }
+
+        unsafe {
+            ManuallyDrop::drop(&mut self.js_runtime);
+        }
+
+        self.drop_token.cancel();
+    }
+}
+
+impl DenoRuntime<DefaultRuntimeContext> {
+    pub async fn acquire() -> OwnedSemaphorePermit {
+        RUNTIME_CREATION_SEM
+            .with(|v| v.clone())
+            .acquire_owned()
+            .await
+            .unwrap()
     }
 }
 
@@ -223,46 +425,61 @@ where
 {
     #[allow(clippy::unnecessary_literal_unwrap)]
     #[allow(clippy::arc_with_non_send_sync)]
-    pub async fn new(
-        opts: WorkerContextInitOpts,
-        maybe_inspector: Option<Inspector>,
-    ) -> Result<Self, Error> {
+    pub(crate) async fn new(mut worker: Worker) -> Result<Self, Error> {
+        let init_opts = worker.init_opts.take();
+        let flags = worker.flags.clone();
+
+        debug_assert!(init_opts.is_some(), "init_opts must not be None");
+
         let WorkerContextInitOpts {
+            mut conf,
             service_path,
             no_module_cache,
             import_map_path,
             env_vars,
-            events_rx,
-            conf,
             maybe_eszip,
             maybe_entrypoint,
             maybe_decorator,
             maybe_module_code,
             static_patterns,
             maybe_jsx_import_source_config,
+            maybe_s3_fs_config,
+            maybe_tmp_fs_config,
             ..
-        } = opts;
+        } = init_opts.unwrap();
 
         // TODO(Nyannyacha): Make sure `service_path` is an absolute path first.
 
         let drop_token = CancellationToken::default();
+        let termination_request_token = CancellationToken::default();
+        let promise_metrics = PromiseMetrics::default();
+        let runtime_state = Arc::<RuntimeState>::default();
 
         let base_dir_path = std::env::current_dir().map(|p| p.join(&service_path))?;
-        let base_url = Url::from_directory_path(&base_dir_path).unwrap();
+        let Ok(mut main_module_url) = Url::from_directory_path(&base_dir_path) else {
+            bail!(
+                "malformed base directory: {}",
+                base_dir_path.to_string_lossy()
+            );
+        };
 
-        let is_user_worker = conf.is_user_worker();
+        static POTENTIAL_EXTS: &[&str] = &["ts", "tsx", "js", "mjs", "jsx"];
 
-        let potential_exts = vec!["ts", "tsx", "js", "jsx"];
-        let mut main_module_url = base_url.join("index.ts")?;
-
-        for potential_ext in potential_exts {
-            main_module_url = base_url.join(format!("index.{}", potential_ext).as_str())?;
+        for ext in POTENTIAL_EXTS.iter() {
+            main_module_url = main_module_url.join(format!("index.{}", ext).as_str())?;
             if main_module_url.to_file_path().unwrap().exists() {
                 break;
             }
         }
 
+        let is_user_worker = conf.is_user_worker();
         let is_some_entry_point = maybe_entrypoint.is_some();
+
+        let maybe_user_conf = conf.as_user_worker();
+        let user_context = maybe_user_conf
+            .and_then(|it| it.context.clone())
+            .unwrap_or_default();
+
         if is_some_entry_point {
             main_module_url = Url::parse(&maybe_entrypoint.unwrap())?;
         }
@@ -270,8 +487,9 @@ where
         let mut net_access_disabled = false;
         let mut allow_net = None;
         let mut allow_remote_modules = true;
+
         if is_user_worker {
-            let user_conf = conf.as_user_worker().unwrap();
+            let user_conf = maybe_user_conf.unwrap();
 
             net_access_disabled = user_conf.net_access_disabled;
             allow_remote_modules = user_conf.allow_remote_modules;
@@ -287,7 +505,7 @@ where
             };
         }
 
-        let mut maybe_arc_import_map = None;
+        let mut maybe_import_map = None;
         let only_module_code =
             maybe_module_code.is_some() && maybe_eszip.is_none() && !is_some_entry_point;
 
@@ -302,20 +520,23 @@ where
                 CacheSetting::Use
             };
 
+            if let Some(npmrc_path) = find_up(".npmrc", &base_dir_path) {
+                if npmrc_path.exists() && npmrc_path.is_file() {
+                    emitter_factory.set_npmrc_path(npmrc_path);
+                    emitter_factory.set_npmrc_env_vars(env_vars.clone());
+                }
+            }
+
             emitter_factory.set_file_fetcher_allow_remote(allow_remote_modules);
-            emitter_factory.set_file_fetcher_cache_strategy(cache_strategy);
+            emitter_factory.set_cache_strategy(cache_strategy);
             emitter_factory.set_decorator_type(maybe_decorator);
 
             if let Some(jsx_import_source_config) = maybe_jsx_import_source_config.clone() {
-                emitter_factory
-                    .set_jsx_import_source(jsx_import_source_config)
-                    .await;
+                emitter_factory.set_jsx_import_source(jsx_import_source_config);
             }
 
-            let maybe_import_map = load_import_map(import_map_path.clone())?;
-
-            emitter_factory.set_import_map(maybe_import_map);
-            maybe_arc_import_map.clone_from(&emitter_factory.maybe_import_map);
+            emitter_factory.set_import_map(load_import_map(import_map_path.clone())?);
+            maybe_import_map.clone_from(&emitter_factory.maybe_import_map);
 
             let arc_emitter_factory = Arc::new(emitter_factory);
             let main_module_url_file_path = main_module_url.clone().to_file_path().unwrap();
@@ -330,6 +551,8 @@ where
                 arc_emitter_factory,
                 maybe_code,
                 import_map_path.clone(),
+                // here we don't want to add extra cost, so we won't use a checksum
+                None,
             )
             .await?;
 
@@ -367,7 +590,7 @@ where
                     let roots = load_native_certs().expect("could not load platform certs");
                     for root in roots {
                         root_cert_store
-                            .add(&rustls::Certificate(root.0))
+                            .add((&*root.0).into())
                             .expect("Failed to add platform cert to root cert store");
                     }
                 }
@@ -393,16 +616,23 @@ where
             });
         }
 
+        let has_inspector = worker.inspector.is_some();
+        let need_source_map = user_context
+            .get("sourceMap")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or_default();
+
         let rt_provider = create_module_loader_for_standalone_from_eszip_kind(
             eszip,
             base_dir_path.clone(),
-            maybe_arc_import_map,
+            maybe_import_map,
             import_map_path,
-            maybe_inspector.is_some(),
+            has_inspector || need_source_map,
         )
         .await?;
 
         let RuntimeProviders {
+            node_resolver,
             npm_resolver,
             vfs,
             module_loader,
@@ -412,23 +642,61 @@ where
             vfs_path: _,
         } = rt_provider;
 
-        let op_fs = {
-            /* TODO: TREX ENABLE FILE ACCESS
-            if is_user_worker {
-                Arc::new(StaticFs::new(
-                    static_files,
-                    base_dir_path,
-                    vfs_path,
-                    vfs,
-                    npm_snapshot,
-                )) as Arc<dyn deno_fs::FileSystem>
-            } else {*/
-            Arc::new(DenoCompileFileSystem::from_rc(vfs)) as Arc<dyn deno_fs::FileSystem>
-            //}
-        };
+        let mut maybe_s3_fs = None;
+        let build_file_system_fn =
+            |base_fs: Arc<dyn deno_fs::FileSystem>| -> Result<Arc<dyn deno_fs::FileSystem>, AnyError> {
+                let tmp_fs = TmpFs::try_from(maybe_tmp_fs_config.unwrap_or_default())?;
+                let fs = PrefixFs::new("/tmp", tmp_fs, Some(base_fs))
+                    .tmp_dir("/tmp");
+
+                Ok(if let Some(s3_fs) = maybe_s3_fs_config.map(S3Fs::new).transpose()? {
+                    maybe_s3_fs = Some(s3_fs.clone());
+                    Arc::new(fs.add_fs("/s3", s3_fs))
+                } else {
+                    Arc::new(fs)
+                })
+            };
+
+        let file_system = build_file_system_fn(
+        /*TODO: TREX ENABLE FILE ACCESS
+        if is_user_worker {
+            Arc::new(StaticFs::new(
+                static_files,
+                base_dir_path,
+                vfs_path,
+                vfs,
+                npm_snapshot,
+            ))
+        } else {*/
+            Arc::new(DenoCompileFileSystem::from_rc(vfs))
+        //}
+        )?;
+
+        /* NOTE(kallebysantos): Cache via SqliteBackedCache is disabled.
+         *
+         * ```
+         * let cache_base_dir = dirs::cache_dir()
+         *     .context("could not resolve cache directory")?
+         *     .join("web_caches");
+         *
+         * tokio::fs::create_dir_all(cache_base_dir.as_path())
+         *     .await
+         *     .context("could not make cache directory")?;
+         *
+         * struct CacheStorageDir(TempDir);
+         *
+         * let cache_storage_dir = CacheStorageDir(
+         *     tempfile::tempdir_in(cache_base_dir).context("could not make cache directory")?,
+         * );
+         *
+         * let cache_backend = CreateCache(Arc::new({
+         *     let dir = cache_storage_dir.0.path().to_path_buf();
+         *     move || SqliteBackedCache::new(dir.clone())
+         * }));
+         * ```
+         */
 
         let mod_code = module_code;
-
         let extensions = vec![
             sb_core_permissions::init_ops(net_access_disabled, allow_net),
             deno_webidl::deno_webidl::init_ops(),
@@ -459,7 +727,7 @@ where
             deno_tls::deno_tls::init_ops(),
             deno_http::deno_http::init_ops::<DefaultHttpPropertyExtractor>(),
             deno_io::deno_io::init_ops(stdio),
-            deno_fs::deno_fs::init_ops::<Permissions>(op_fs.clone()),
+            deno_fs::deno_fs::init_ops::<Permissions>(file_system.clone()),
             sb_env_op::init_ops(),
             sb_ai::init_ops(),
             sb_os::sb_os::init_ops(),
@@ -472,25 +740,49 @@ where
             sb_core_http_start::init_ops(),
             // NOTE(AndresP): Order is matters. Otherwise, it will lead to hard
             // errors such as SIGBUS depending on the platform.
-            deno_node::init_ops::<Permissions>(Some(npm_resolver), op_fs),
+            deno_node::init_ops::<Permissions>(
+                Some(node_resolver),
+                Some(npm_resolver),
+                file_system,
+            ),
+            deno_cache::deno_cache::init_ops::<SqliteBackedCache>(None),
             sb_core_runtime::init_ops(Some(main_module_url.clone())),
         ];
 
         let mut create_params = None;
         let mut mem_check = MemCheck::default();
 
-        if conf.is_user_worker() {
-            let memory_limit =
-                mib_to_bytes(conf.as_user_worker().unwrap().memory_limit_mb) as usize;
+        let beforeunload_cpu_threshold = ArcSwapOption::<u64>::from_pointee(None);
+        let beforeunload_mem_threshold = ArcSwapOption::<u64>::from_pointee(None);
 
-            let allocator = CustomAllocator::new(memory_limit);
+        if conf.is_user_worker() {
+            let conf = maybe_user_conf.unwrap();
+            let memory_limit_bytes = mib_to_bytes(conf.memory_limit_mb) as usize;
+
+            beforeunload_mem_threshold.store(
+                flags
+                    .beforeunload_memory_pct
+                    .and_then(|it| percentage_value(memory_limit_bytes as u64, it))
+                    .map(Arc::new),
+            );
+
+            if conf.cpu_time_hard_limit_ms > 0 {
+                beforeunload_cpu_threshold.store(
+                    flags
+                        .beforeunload_cpu_pct
+                        .and_then(|it| percentage_value(conf.cpu_time_hard_limit_ms, it))
+                        .map(Arc::new),
+                );
+            }
+
+            let allocator = CustomAllocator::new(memory_limit_bytes);
 
             allocator.set_waker(mem_check.waker.clone());
 
-            mem_check.limit = Some(memory_limit);
+            mem_check.limit = Some(memory_limit_bytes);
             create_params = Some(
-                deno_core::v8::CreateParams::default()
-                    .heap_limits(mib_to_bytes(0) as usize, memory_limit)
+                v8::CreateParams::default()
+                    .heap_limits(mib_to_bytes(0) as usize, memory_limit_bytes)
                     .array_buffer_allocator(allocator.into_v8_allocator()),
             )
         };
@@ -499,59 +791,73 @@ where
         let runtime_options = RuntimeOptions {
             extensions,
             is_main: true,
-            inspector: maybe_inspector.is_some(),
+            inspector: has_inspector,
             create_params,
             get_error_class_fn: Some(&get_error_class_name),
             shared_array_buffer_store: None,
             compiled_wasm_module_store: None,
             startup_snapshot: snapshot::snapshot(),
             module_loader: Some(module_loader),
+            import_meta_resolve_callback: Some(Box::new(import_meta_resolve_callback)),
             ..Default::default()
         };
 
         let mut js_runtime = JsRuntime::new(runtime_options);
-        let version: Option<&str> = option_env!("GIT_V_TAG");
+
+        let dispatch_fns = {
+            let context = js_runtime.main_context();
+            let scope = &mut js_runtime.handle_scope();
+            let context_local = v8::Local::new(scope, context);
+            let global_obj = context_local.global(scope);
+            let bootstrap_str =
+                v8::String::new_external_onebyte_static(scope, b"bootstrap").unwrap();
+            let bootstrap_ns = global_obj
+                .get(scope, bootstrap_str.into())
+                .unwrap()
+                .to_object(scope)
+                .unwrap();
+
+            macro_rules! get_global {
+                ($name:expr) => {{
+                    let dispatch_fn_str =
+                        v8::String::new_external_onebyte_static(scope, $name).unwrap();
+                    let dispatch_fn = v8::Local::<v8::Function>::try_from(
+                        bootstrap_ns.get(scope, dispatch_fn_str.into()).unwrap(),
+                    )
+                    .unwrap();
+                    v8::Global::new(scope, dispatch_fn)
+                }};
+            }
+
+            DispatchEventFunctions {
+                dispatch_load_event_fn_global: get_global!(b"dispatchLoadEvent"),
+                dispatch_beforeunload_event_fn_global: get_global!(b"dispatchBeforeUnloadEvent"),
+                dispatch_unload_event_fn_global: get_global!(b"dispatchUnloadEvent"),
+                dispatch_drain_event_fn_global: get_global!(b"dispatchDrainEvent"),
+            }
+        };
 
         {
-            // @andreespirela : We do this because "NODE_DEBUG" is trying to be read during
-            // initialization, But we need the gotham state to be up-to-date
-            let op_state_rc = js_runtime.op_state();
-            let mut op_state = op_state_rc.borrow_mut();
-            op_state.put::<sb_env::EnvVars>(sb_env::EnvVars::new());
+            let main_context = js_runtime.main_context();
+            let op_state = js_runtime.op_state();
+            let mut op_state = op_state.borrow_mut();
+
+            op_state.put(dispatch_fns);
+            op_state.put(promise_metrics.clone());
+            op_state.put(runtime_state.clone());
+            op_state.put(GlobalMainContext(main_context));
         }
 
-        // Bootstrapping stage
-        let script = format!(
-            "globalThis.bootstrapSBEdge({}, {})",
-            serde_json::json!([
-                // 0: target
-                env!("TARGET"),
-                // 1: isUserWorker
-                conf.is_user_worker(),
-                // 2: isEventsWorker
-                conf.is_events_worker(),
-                // 3: edgeRuntimeVersion
-                version.unwrap_or("0.1.0"),
-                // 4: denoVersion
-                MAYBE_DENO_VERSION
-                    .get()
-                    .map(|it| &**it)
-                    .unwrap_or("UNKNOWN"),
-                // 5: shouldDisableDeprecatedApiWarning
-                SHOULD_DISABLE_DEPRECATED_API_WARNING
-                    .get()
-                    .copied()
-                    .unwrap_or_default(),
-                // 6: shouldUseVerboseDeprecatedApiWarning
-                SHOULD_USE_VERBOSE_DEPRECATED_API_WARNING
-                    .get()
-                    .copied()
-                    .unwrap_or_default(),
-            ]),
-            serde_json::json!(RuntimeContext::get_runtime_context())
-        );
+        {
+            let op_state_rc = js_runtime.op_state();
+            let mut op_state = op_state_rc.borrow_mut();
 
-        if let Some(inspector) = maybe_inspector.clone() {
+            // NOTE(Andreespirela): We do this because "NODE_DEBUG" is trying to be read during
+            // initialization, But we need the gotham state to be up-to-date.
+            op_state.put(sb_env::EnvVars::default());
+        }
+
+        if let Some(inspector) = worker.inspector.as_ref() {
             inspector.server.register_inspector(
                 main_module_url.to_string(),
                 &mut js_runtime,
@@ -572,9 +878,62 @@ where
                 .put(MemCheckWaker::from(mem_check.waker.clone()));
         }
 
+        // Bootstrapping stage
+        let (runtime_context, extra_context, bootstrap_fn) = {
+            let runtime_context = serde_json::json!(RuntimeContext::get_runtime_context(
+                &conf,
+                has_inspector,
+                option_env!("GIT_V_TAG"),
+            ));
+
+            let tokens = {
+                let op_state = js_runtime.op_state();
+                let resource_table = &mut op_state.borrow_mut().resource_table;
+                serde_json::json!({
+                    "terminationRequestToken": resource_table.add(DropToken(termination_request_token.clone()))
+                })
+            };
+
+            let extra_context = {
+                let mut context = serde_json::json!(RuntimeContext::get_extra_context());
+
+                json::merge_object(&mut context, &serde_json::Value::Object(user_context));
+                json::merge_object(&mut context, &tokens);
+
+                context
+            };
+
+            let context = js_runtime.main_context();
+            let scope = &mut js_runtime.handle_scope();
+            let context_local = v8::Local::new(scope, context);
+            let global_obj = context_local.global(scope);
+            let bootstrap_str =
+                v8::String::new_external_onebyte_static(scope, b"bootstrapSBEdge").unwrap();
+            let bootstrap_fn = v8::Local::<v8::Function>::try_from(
+                global_obj.get(scope, bootstrap_str.into()).unwrap(),
+            )
+            .unwrap();
+
+            let runtime_context_local = deno_core::serde_v8::to_v8(scope, runtime_context)
+                .context("failed to convert to v8 value")?;
+            let runtime_context_global = v8::Global::new(scope, runtime_context_local);
+            let extra_context_local = deno_core::serde_v8::to_v8(scope, extra_context)
+                .context("failed to convert to v8 value")?;
+            let extra_context_global = v8::Global::new(scope, extra_context_local);
+            let bootstrap_fn_global = v8::Global::new(scope, bootstrap_fn);
+
+            (
+                runtime_context_global,
+                extra_context_global,
+                bootstrap_fn_global,
+            )
+        };
+
         js_runtime
-            .execute_script(located_script_name!(), ModuleCodeString::from(script))
-            .expect("Failed to execute bootstrap script");
+            .call_with_args(&bootstrap_fn, &[runtime_context, extra_context])
+            .now_or_never()
+            .transpose()
+            .context("failed to execute bootstrap script")?;
 
         {
             // run inside a closure, so op_state_rc is released
@@ -583,10 +942,10 @@ where
 
             let mut env_vars = env_vars.clone();
 
-            if conf.is_events_worker() {
-                // if worker is an events worker, assert events_rx is to be available
-                op_state
-                    .put::<mpsc::UnboundedReceiver<WorkerEventWithMetadata>>(events_rx.unwrap());
+            if let Some(opts) = conf.as_events_worker_mut() {
+                op_state.put::<mpsc::UnboundedReceiver<WorkerEventWithMetadata>>(
+                    opts.events_msg_rx.take().unwrap(),
+                );
             }
 
             if conf.is_main_worker() || conf.is_user_worker() {
@@ -611,8 +970,8 @@ where
                 }
             }
 
-            op_state.put::<sb_env::EnvVars>(env_vars);
-            op_state.put(DenoRuntimeDropToken(drop_token.clone()))
+            op_state.put(sb_env::EnvVars(env_vars));
+            op_state.put(DenoRuntimeDropToken(DropToken(drop_token.clone())));
         }
 
         let main_module_id = {
@@ -650,31 +1009,37 @@ where
         }
 
         Ok(Self {
+            runtime_state,
+            js_runtime: ManuallyDrop::new(js_runtime),
+
             drop_token,
-            js_runtime,
+            termination_request_token,
+
             env_vars,
             conf,
-
-            is_termination_requested: Arc::default(),
-            is_terminated: Arc::default(),
-            is_found_inspector_session: Arc::default(),
+            s3_fs: maybe_s3_fs,
 
             main_module_id,
-            maybe_inspector,
+            worker,
+            promise_metrics,
 
             mem_check,
             waker: Arc::default(),
+
+            beforeunload_cpu_threshold: Arc::new(beforeunload_cpu_threshold),
+            beforeunload_mem_threshold: Arc::new(beforeunload_mem_threshold),
 
             _phantom_runtime_context: PhantomData,
         })
     }
 
-    pub async fn run(
-        &mut self,
-        duplex_stream_rx: mpsc::UnboundedReceiver<DuplexStreamEntry>,
-        maybe_cpu_usage_metrics_tx: Option<mpsc::UnboundedSender<CPUUsageMetrics>>,
-        name: Option<String>,
-    ) -> (Result<(), Error>, i64) {
+    pub async fn run(&mut self, options: RunOptions) -> (Result<(), Error>, i64) {
+        let RunOptions {
+            wait_termination_request_token,
+            duplex_stream_rx,
+            maybe_cpu_usage_metrics_tx,
+        } = options;
+
         {
             let op_state_rc = self.js_runtime.op_state();
             let mut op_state = op_state_rc.borrow_mut();
@@ -688,31 +1053,31 @@ where
             }
         }
 
-        let send_cpu_metrics_fn = |metric: CPUUsageMetrics| {
-            if let Some(cpu_metric_tx) = maybe_cpu_usage_metrics_tx.as_ref() {
-                let _ = cpu_metric_tx.send(metric);
-            }
-        };
+        let _terminate_guard = scopeguard::guard(self.runtime_state.terminated.clone(), |v| {
+            v.raise();
+        });
 
         // NOTE: This is unnecessary on the LIFO task scheduler that can't steal
         // the task from the other threads.
         let current_thread_id = std::thread::current().id();
-        let mut current_cpu_time_ns;
         let mut accumulated_cpu_time_ns = 0i64;
 
+        let span = debug_span!("runtime", thread_id = ?current_thread_id);
         let inspector = self.inspector();
-        let mod_result_rx = unsafe {
+        let mut mod_result_rx = unsafe {
             self.js_runtime.v8_isolate().enter();
 
             if inspector.is_some() {
-                let is_terminated = self.is_terminated.clone();
-                let mut this = scopeguard::guard_on_unwind(&mut *self, |this| {
-                    this.js_runtime.v8_isolate().exit();
-                    is_terminated.raise();
+                let state = self.runtime_state.clone();
+                let mut this = scopeguard::guard_on_unwind(&mut *self, {
+                    |this| {
+                        this.js_runtime.v8_isolate().exit();
+                        state.terminated.raise();
+                    }
                 });
 
                 {
-                    let _guard = scopeguard::guard(this.is_found_inspector_session.clone(), |v| {
+                    let _guard = scopeguard::guard(state.found_inspector_session.clone(), |v| {
                         v.raise();
                     });
 
@@ -724,9 +1089,9 @@ where
                     this.wait_for_inspector_session();
                 }
 
-                if this.is_termination_requested.is_raised() {
+                if this.termination_request_token.is_cancelled() {
                     this.js_runtime.v8_isolate().exit();
-                    is_terminated.raise();
+                    state.terminated.raise();
                     return (Ok(()), 0i64);
                 }
             }
@@ -735,30 +1100,156 @@ where
                 it.v8_isolate().exit();
             });
 
-            send_cpu_metrics_fn(CPUUsageMetrics::Enter(current_thread_id));
+            with_cpu_metrics_guard(
+                current_thread_id,
+                js_runtime.op_state(),
+                &maybe_cpu_usage_metrics_tx,
+                &mut accumulated_cpu_time_ns,
+                || js_runtime.mod_evaluate(self.main_module_id),
+            )
+        }
+        .instrument(span.clone());
 
-            current_cpu_time_ns = get_current_cpu_time_ns().unwrap();
+        macro_rules! get_accumulated_cpu_time_ms {
+            () => {
+                accumulated_cpu_time_ns / 1_000_000
+            };
+        }
 
-            let top_level_await_fut = js_runtime.mod_evaluate(self.main_module_id);
-            let cpu_time_after_eval_ns = get_current_cpu_time_ns().unwrap();
-            let diff_cpu_time_ns = cpu_time_after_eval_ns - current_cpu_time_ns;
+        {
+            let evaluating_mod =
+                scopeguard::guard(self.runtime_state.evaluating_mod.clone(), |v| {
+                    v.lower();
+                });
 
-            accumulated_cpu_time_ns += diff_cpu_time_ns;
+            evaluating_mod.raise();
 
-            send_cpu_metrics_fn(CPUUsageMetrics::Leave(CPUUsage {
-                accumulated: accumulated_cpu_time_ns,
-                diff: diff_cpu_time_ns,
-            }));
+            let event_loop_fut = self
+                .run_event_loop(
+                    current_thread_id,
+                    wait_termination_request_token,
+                    &maybe_cpu_usage_metrics_tx,
+                    &mut accumulated_cpu_time_ns,
+                )
+                .instrument(span.clone());
 
-            top_level_await_fut
-        };
+            let mod_result = tokio::select! {
+                // Not using biased mode leads to non-determinism for relatively simple
+                // programs.
+                biased;
 
-        let is_termination_requested = self.is_termination_requested.clone();
+                maybe_mod_result = &mut mod_result_rx => {
+                    debug!("received module evaluate {:#?}", maybe_mod_result);
+                    maybe_mod_result
+
+                }
+
+                event_loop_result = event_loop_fut => {
+                    if let Err(err) = event_loop_result {
+                        Err(anyhow!("event loop error while evaluating the module: {}", err))
+                    } else {
+                        mod_result_rx.await
+                    }
+                }
+            };
+
+            if let Err(err) = mod_result {
+                return (Err(err), get_accumulated_cpu_time_ms!());
+            }
+            if self.runtime_state.is_event_loop_completed()
+                && self.promise_metrics.have_all_promises_been_resolved()
+            {
+                return (Ok(()), get_accumulated_cpu_time_ms!());
+            }
+
+            let mut this = self.get_v8_tls_guard();
+
+            if !this.termination_request_token.is_cancelled() {
+                if let Err(err) = with_cpu_metrics_guard(
+                    current_thread_id,
+                    this.js_runtime.op_state(),
+                    &maybe_cpu_usage_metrics_tx,
+                    &mut accumulated_cpu_time_ns,
+                    || MaybeDenoRuntime::DenoRuntime(*this).dispatch_load_event(),
+                ) {
+                    return (Err(err), get_accumulated_cpu_time_ms!());
+                }
+            }
+        }
+
+        self.runtime_state.event_loop_completed.lower();
+
+        if let Err(err) = self
+            .run_event_loop(
+                current_thread_id,
+                wait_termination_request_token,
+                &maybe_cpu_usage_metrics_tx,
+                &mut accumulated_cpu_time_ns,
+            )
+            .instrument(span)
+            .await
+        {
+            return (
+                Err(anyhow!("event loop error: {}", err)),
+                get_accumulated_cpu_time_ms!(),
+            );
+        }
+
+        if !self.conf.is_user_worker() {
+            let mut this = self.get_v8_tls_guard();
+            let mut this = this.get_v8_termination_guard();
+
+            if let Err(err) = with_cpu_metrics_guard(
+                current_thread_id,
+                this.js_runtime.op_state(),
+                &maybe_cpu_usage_metrics_tx,
+                &mut accumulated_cpu_time_ns,
+                || MaybeDenoRuntime::DenoRuntime(&mut this).dispatch_unload_event(),
+            ) {
+                return (Err(err), get_accumulated_cpu_time_ms!());
+            }
+
+            // TODO(Nyannyacha): Here we also need to trigger the event for node platform (i.e; exit)
+        }
+
+        (Ok(()), get_accumulated_cpu_time_ms!())
+    }
+
+    fn run_event_loop<'l>(
+        &'l mut self,
+        #[allow(unused_variables)] current_thread_id: ThreadId,
+        wait_termination_request_token: bool,
+        maybe_cpu_usage_metrics_tx: &'l Option<mpsc::UnboundedSender<CPUUsageMetrics>>,
+        accumulated_cpu_time_ns: &'l mut i64,
+    ) -> impl Future<Output = Result<(), AnyError>> + 'l {
+        let has_inspector = self.inspector().is_some();
         let is_user_worker = self.conf.is_user_worker();
         let global_waker = self.waker.clone();
-        let mem_check = is_user_worker.then(|| self.mem_check.clone());
 
-        let poll_result = poll_fn(|cx| unsafe {
+        let mut termination_request_fut = self
+            .termination_request_token
+            .clone()
+            .cancelled_owned()
+            .boxed();
+
+        let beforeunload_cpu_threshold = self.beforeunload_cpu_threshold.clone();
+        let beforeunload_mem_threshold = self.beforeunload_mem_threshold.clone();
+
+        let state = self.runtime_state.clone();
+        let mem_check_state = is_user_worker.then(|| self.mem_check.clone());
+        let mut poll_sem = None::<PollSemaphore>;
+
+        poll_fn(move |cx| {
+            if poll_sem.is_none() {
+                poll_sem = Some(RUNTIME_CREATION_SEM.with(|v| PollSemaphore::new(v.clone())));
+            }
+
+            let Poll::Ready(Some(_permit)) = poll_sem.as_mut().unwrap().poll_acquire(cx) else {
+                return Poll::Pending;
+            };
+
+            poll_sem = None;
+
             // INVARIANT: Only can steal current task by other threads when LIFO
             // task scheduler heuristic disabled. Turning off the heuristic is
             // unstable now, so it's not considered.
@@ -771,16 +1262,17 @@ where
 
             global_waker.register(waker);
 
-            let mut js_runtime = scopeguard::guard(&mut self.js_runtime, |it| {
-                it.v8_isolate().exit();
-            });
+            let mut this = self.get_v8_tls_guard();
 
-            js_runtime.v8_isolate().enter();
-            send_cpu_metrics_fn(CPUUsageMetrics::Enter(thread_id));
+            let js_runtime = &mut this.js_runtime;
+            let cpu_metrics_guard = get_cpu_metrics_guard(
+                thread_id,
+                js_runtime.op_state(),
+                maybe_cpu_usage_metrics_tx,
+                accumulated_cpu_time_ns,
+            );
 
-            current_cpu_time_ns = get_current_cpu_time_ns().unwrap();
-
-            let wait_for_inspector = if inspector.is_some() {
+            let wait_for_inspector = if has_inspector {
                 let inspector = js_runtime.inspector();
                 let inspector_ref = inspector.borrow();
                 inspector_ref.has_active_sessions() || inspector_ref.has_blocking_sessions()
@@ -808,76 +1300,94 @@ where
                     &mut std::task::Context::from_waker(waker.as_ref()),
                     PollEventLoopOptions {
                         wait_for_inspector,
-                        pump_v8_message_loop: true,
+                        ..Default::default()
                     },
                 )
             } else {
                 Poll::Pending
             };
 
-            let cpu_time_after_poll_ns = get_current_cpu_time_ns().unwrap();
-            let diff_cpu_time_ns = if need_pool_event_loop {
-                cpu_time_after_poll_ns - current_cpu_time_ns
-            } else {
-                0
-            };
-
-            accumulated_cpu_time_ns += diff_cpu_time_ns;
-
-            send_cpu_metrics_fn(CPUUsageMetrics::Leave(CPUUsage {
-                accumulated: accumulated_cpu_time_ns,
-                diff: diff_cpu_time_ns,
-            }));
+            drop(cpu_metrics_guard);
 
             if is_user_worker {
-                let mem_state = mem_check.as_ref().unwrap();
+                let mem_state = mem_check_state.as_ref().unwrap();
                 let total_malloced_bytes = mem_state.check(js_runtime.v8_isolate().as_mut());
 
                 mem_state.waker.register(waker);
 
-                trace!(
-                    "name: {:?}, thread_id: {:?}, accumulated_cpu_time: {}ms, malloced: {}",
-                    name.as_ref(),
-                    thread_id,
-                    accumulated_cpu_time_ns / 1_000_000,
-                    bytes_to_display(total_malloced_bytes as u64)
-                );
+                if let Some(threshold_ms) = beforeunload_cpu_threshold.load().as_deref().copied() {
+                    let threshold_ns = (threshold_ms as i128) * 1_000_000;
+                    let accumulated_cpu_time_ns = *accumulated_cpu_time_ns as i128;
+
+                    if accumulated_cpu_time_ns >= threshold_ns {
+                        beforeunload_cpu_threshold.store(None);
+
+                        if let Err(err) = MaybeDenoRuntime::DenoRuntime(&mut this)
+                            .dispatch_beforeunload_event(WillTerminateReason::CPU)
+                        {
+                            return Poll::Ready(Err(err));
+                        }
+                    }
+                }
+
+                if let Some(limit) = mem_state.limit {
+                    if total_malloced_bytes >= limit / 2 {
+                        state.mem_reached_half.raise();
+                    } else {
+                        state.mem_reached_half.lower();
+                    }
+                }
+
+                if let Some(threshold_bytes) = beforeunload_mem_threshold.load().as_deref().copied()
+                {
+                    let total_malloced_bytes = total_malloced_bytes as u64;
+
+                    if total_malloced_bytes >= threshold_bytes {
+                        beforeunload_mem_threshold.store(None);
+
+                        if !mem_state.is_exceeded() {
+                            if let Err(err) = MaybeDenoRuntime::DenoRuntime(&mut this)
+                                .dispatch_beforeunload_event(WillTerminateReason::Memory)
+                            {
+                                return Poll::Ready(Err(err));
+                            }
+                        }
+                    }
+                }
             }
 
-            // NOTE(Nyannyacha): If tasks are empty or V8 is not evaluating the
-            // function, and so V8 is no longer inside its loop, it turns out
-            // that requesting termination does not work; thus, we need another
-            // way to escape from the polling loop so the supervisor can
-            // terminate the runtime.
             if need_pool_event_loop
                 && poll_result.is_pending()
-                && is_termination_requested.is_raised()
+                && termination_request_fut.poll_unpin(cx).is_ready()
             {
                 return Poll::Ready(Ok(()));
             }
 
-            poll_result
-        })
-        .await;
+            match poll_result {
+                Poll::Pending => Poll::Pending,
+                Poll::Ready(err @ Err(_)) => Poll::Ready(err),
+                Poll::Ready(Ok(())) => {
+                    if !state.is_event_loop_completed() {
+                        state.event_loop_completed.raise();
+                    }
+                    if wait_termination_request_token
+                        && !termination_request_fut.poll_unpin(cx).is_ready()
+                    {
+                        return Poll::Pending;
+                    }
 
-        let result = match poll_result {
-            Err(err) => Err(anyhow!("event loop error: {}", err)),
-            Ok(_) => match mod_result_rx.await {
-                Err(e) => {
-                    error!("{}", e.to_string());
-                    Err(e)
+                    Poll::Ready(Ok(()))
                 }
-                Ok(_) => Ok(()),
-            },
-        };
-
-        self.is_terminated.raise();
-
-        (result, accumulated_cpu_time_ns / 1_000_000)
+            }
+        })
     }
 
     pub fn inspector(&self) -> Option<Inspector> {
-        self.maybe_inspector.clone()
+        self.worker.inspector.clone()
+    }
+
+    pub fn promise_metrics(&self) -> PromiseMetrics {
+        self.promise_metrics.clone()
     }
 
     pub fn mem_check_state(&self) -> Arc<RwLock<MemCheckState>> {
@@ -910,8 +1420,11 @@ where
         }));
     }
 
+    #[instrument(level = "debug", skip(self))]
     fn wait_for_inspector_session(&mut self) {
-        if let Some(inspector) = self.maybe_inspector.as_ref() {
+        debug!(has_inspector = self.worker.inspector.is_some());
+        if let Some(inspector) = self.worker.inspector.as_ref() {
+            debug!(addr = %inspector.server.host, server.inspector = ?inspector.option);
             let inspector_impl = self.js_runtime.inspector();
             let mut inspector_impl_ref = inspector_impl.borrow_mut();
 
@@ -922,10 +1435,364 @@ where
             }
         }
     }
+
+    fn terminate_execution_if_cancelled(
+        &mut self,
+    ) -> ScopeGuard<CancellationToken, Box<dyn FnOnce(CancellationToken)>> {
+        terminate_execution_if_cancelled(
+            self.js_runtime.v8_isolate(),
+            self.termination_request_token.clone(),
+        )
+    }
+
+    fn get_v8_tls_guard<'l>(
+        &'l mut self,
+    ) -> scopeguard::ScopeGuard<
+        &'l mut DenoRuntime<RuntimeContext>,
+        impl FnOnce(&'l mut DenoRuntime<RuntimeContext>) + 'l,
+    > {
+        let mut guard = scopeguard::guard(self, |v| unsafe {
+            v.js_runtime.v8_isolate().exit();
+        });
+
+        unsafe {
+            guard.js_runtime.v8_isolate().enter();
+        }
+
+        guard
+    }
+
+    fn get_v8_termination_guard<'l>(
+        &'l mut self,
+    ) -> scopeguard::ScopeGuard<
+        &'l mut DenoRuntime<RuntimeContext>,
+        impl FnOnce(&'l mut DenoRuntime<RuntimeContext>) + 'l,
+    > {
+        let was_terminating_execution = self.js_runtime.v8_isolate().is_execution_terminating();
+        let mut guard = scopeguard::guard(self, move |v| {
+            if was_terminating_execution {
+                v.js_runtime.v8_isolate().terminate_execution();
+            }
+
+            v.js_runtime
+                .v8_isolate()
+                .set_microtasks_policy(v8::MicrotasksPolicy::Auto);
+        });
+
+        guard.js_runtime.v8_isolate().cancel_terminate_execution();
+        guard
+            .js_runtime
+            .v8_isolate()
+            .set_microtasks_policy(v8::MicrotasksPolicy::Explicit);
+        guard
+    }
 }
 
-fn get_current_cpu_time_ns() -> Result<i64, Error> {
-    get_thread_time().context("can't get current thread time")
+type TerminateExecutionIfCancelledReturnType =
+    ScopeGuard<CancellationToken, Box<dyn FnOnce(CancellationToken)>>;
+
+#[allow(dead_code)]
+struct Scope<'s> {
+    context: v8::Local<'s, v8::Context>,
+    scope: v8::CallbackScope<'s, ()>,
+}
+
+impl<'s> Scope<'s> {
+    fn context_scope<'l>(&'l mut self) -> v8::ContextScope<'l, v8::HandleScope<'s>> {
+        let context = self.context;
+        v8::ContextScope::new(&mut self.scope, context)
+    }
+}
+
+pub struct IsolateWithCancellationToken<'l>(&'l mut v8::Isolate, CancellationToken);
+
+impl std::ops::Deref for IsolateWithCancellationToken<'_> {
+    type Target = v8::Isolate;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.0
+    }
+}
+
+impl std::ops::DerefMut for IsolateWithCancellationToken<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0
+    }
+}
+
+impl IsolateWithCancellationToken<'_> {
+    fn terminate_execution_if_cancelled(
+        &mut self,
+    ) -> ScopeGuard<CancellationToken, Box<dyn FnOnce(CancellationToken)>> {
+        terminate_execution_if_cancelled(self.0, self.1.clone())
+    }
+}
+
+pub enum MaybeDenoRuntime<'l, RuntimeContext> {
+    DenoRuntime(&'l mut DenoRuntime<RuntimeContext>),
+    Isolate(&'l mut v8::Isolate),
+    IsolateWithCancellationToken(IsolateWithCancellationToken<'l>),
+}
+
+impl<'l, RuntimeContext> MaybeDenoRuntime<'l, RuntimeContext>
+where
+    RuntimeContext: GetRuntimeContext,
+{
+    fn scope(&mut self) -> Scope<'_> {
+        let op_state = self.op_state();
+        let op_state_ref = op_state.borrow();
+        let context = op_state_ref
+            .try_borrow::<GlobalMainContext>()
+            .unwrap()
+            .clone();
+
+        let mut scope = unsafe {
+            match self {
+                Self::DenoRuntime(v) => v8::CallbackScope::new(v.js_runtime.v8_isolate()),
+                Self::Isolate(v) => v8::CallbackScope::new(&mut **v),
+                Self::IsolateWithCancellationToken(v) => v8::CallbackScope::new(&mut **v),
+            }
+        };
+
+        let context = context.to_local_context(&mut scope);
+
+        Scope { context, scope }
+    }
+
+    #[allow(unused)]
+    fn v8_isolate(&mut self) -> &mut v8::Isolate {
+        match self {
+            Self::DenoRuntime(v) => v.js_runtime.v8_isolate(),
+            Self::Isolate(v) => v,
+            Self::IsolateWithCancellationToken(v) => v.0,
+        }
+    }
+
+    fn op_state(&mut self) -> Rc<RefCell<OpState>> {
+        match self {
+            Self::DenoRuntime(v) => v.js_runtime.op_state(),
+            Self::Isolate(v) => JsRuntime::op_state_from(v),
+            Self::IsolateWithCancellationToken(v) => JsRuntime::op_state_from(v.0),
+        }
+    }
+
+    fn terminate_execution_if_cancelled(
+        &mut self,
+    ) -> Option<TerminateExecutionIfCancelledReturnType> {
+        match self {
+            Self::DenoRuntime(v) => Some(v.terminate_execution_if_cancelled()),
+            Self::IsolateWithCancellationToken(v) => Some(v.terminate_execution_if_cancelled()),
+            Self::Isolate(_) => None,
+        }
+    }
+
+    fn dispatch_event_with_callback<T, U, V, R>(
+        &mut self,
+        select_dispatch_fn: T,
+        fn_args_fn: U,
+        callback_fn: V,
+    ) -> Result<R, AnyError>
+    where
+        T: for<'r> FnOnce(&'r DispatchEventFunctions) -> &v8::Global<v8::Function>,
+        U: for<'r> FnOnce(&mut v8::HandleScope<'r, ()>) -> Vec<v8::Local<'r, v8::Value>>,
+        V: for<'r> FnOnce(Option<v8::Local<'r, v8::Value>>) -> Result<R, AnyError>,
+    {
+        let _guard = self.terminate_execution_if_cancelled();
+
+        let op_state = self.op_state();
+        let op_state_ref = op_state.borrow();
+        let dispatch_fns = op_state_ref.try_borrow::<DispatchEventFunctions>().unwrap();
+
+        let scope = &mut self.scope();
+        let ctx_scope = &mut scope.context_scope();
+        let tc_scope = &mut v8::TryCatch::new(ctx_scope);
+
+        let event_fn = v8::Local::new(tc_scope, select_dispatch_fn(dispatch_fns));
+
+        drop(op_state_ref);
+
+        let undefined = v8::undefined(tc_scope);
+        let fn_args = &*fn_args_fn(tc_scope);
+        let fn_ret = event_fn.call(tc_scope, undefined.into(), fn_args);
+
+        if let Some(ex) = tc_scope.exception() {
+            let err = JsError::from_v8_exception(tc_scope, ex);
+
+            return Err(err.into());
+        }
+
+        callback_fn(fn_ret)
+    }
+
+    /// Dispatches "load" event to the JavaScript runtime.
+    ///
+    /// Does not poll event loop, and thus not await any of the "load" event handlers.
+    pub fn dispatch_load_event(&mut self) -> Result<(), AnyError> {
+        self.dispatch_event_with_callback(
+            |fns| &fns.dispatch_load_event_fn_global,
+            |_| vec![],
+            |_| Ok(()),
+        )
+    }
+
+    /// Dispatches "beforeunload" event to the JavaScript runtime. Returns a boolean
+    /// indicating if the event was prevented and thus event loop should continue
+    /// running.
+    pub fn dispatch_beforeunload_event(
+        &mut self,
+        reason: WillTerminateReason,
+    ) -> Result<bool, AnyError> {
+        self.dispatch_event_with_callback(
+            |fns| &fns.dispatch_beforeunload_event_fn_global,
+            move |scope| {
+                vec![v8::String::new_external_onebyte_static(
+                    scope,
+                    <&'static str>::from(reason).as_bytes(),
+                )
+                .unwrap()
+                .into()]
+            },
+            |it| Ok(it.unwrap().is_false()),
+        )
+    }
+
+    /// Dispatches "unload" event to the JavaScript runtime.
+    ///
+    /// Does not poll event loop, and thus not await any of the "unload" event handlers.
+    pub fn dispatch_unload_event(&mut self) -> Result<(), AnyError> {
+        // NOTE(Nyannyacha): It is currently not possible to dispatch this event because the
+        // supervisor has forcibly pulled the isolate out of the running state and the
+        // `CancellationToken` prevents function invocation.
+        //
+        // If we want to dispatch this event, we may need to provide an extra margin for the
+        // invocation.
+
+        // self.v8_isolate().cancel_terminate_execution();
+        self.dispatch_event_with_callback(
+            |fns| &fns.dispatch_unload_event_fn_global,
+            |_| vec![],
+            |_| Ok(()),
+        )
+    }
+
+    /// Dispatches "drain" event to the JavaScript runtime.
+    ///
+    /// Does not poll event loop, and thus not await any of the "drain" event handlers.
+    pub fn dispatch_drain_event(&mut self) -> Result<(), AnyError> {
+        self.dispatch_event_with_callback(
+            |fns| &fns.dispatch_drain_event_fn_global,
+            |_| vec![],
+            |_| Ok(()),
+        )
+    }
+}
+
+pub fn import_meta_resolve_callback(
+    loader: &dyn ModuleLoader,
+    specifier: String,
+    referrer: String,
+) -> Result<ModuleSpecifier, AnyError> {
+    loader.resolve(&specifier, &referrer, ResolutionKind::DynamicImport)
+}
+
+fn with_cpu_metrics_guard<'l, F, R>(
+    thread_id: ThreadId,
+    op_state: Rc<RefCell<OpState>>,
+    maybe_cpu_usage_metrics_tx: &'l Option<mpsc::UnboundedSender<CPUUsageMetrics>>,
+    accumulated_cpu_time_ns: &'l mut i64,
+    work_fn: F,
+) -> R
+where
+    F: FnOnce() -> R,
+{
+    let _cpu_metrics_guard = get_cpu_metrics_guard(
+        thread_id,
+        op_state,
+        maybe_cpu_usage_metrics_tx,
+        accumulated_cpu_time_ns,
+    );
+
+    work_fn()
+}
+
+fn get_cpu_metrics_guard<'l>(
+    thread_id: ThreadId,
+    op_state: Rc<RefCell<OpState>>,
+    maybe_cpu_usage_metrics_tx: &'l Option<mpsc::UnboundedSender<CPUUsageMetrics>>,
+    accumulated_cpu_time_ns: &'l mut i64,
+) -> scopeguard::ScopeGuard<(), impl FnOnce(()) + 'l> {
+    let send_cpu_metrics_fn = move |metric: CPUUsageMetrics| {
+        if let Some(cpu_metric_tx) = maybe_cpu_usage_metrics_tx.as_ref() {
+            let _ = cpu_metric_tx.send(metric);
+        }
+    };
+
+    send_cpu_metrics_fn(CPUUsageMetrics::Enter(thread_id));
+
+    let current_cpu_time_ns = get_current_cpu_time_ns().unwrap();
+
+    scopeguard::guard((), move |_| {
+        debug_assert_eq!(thread_id, std::thread::current().id());
+
+        let cpu_time_after_drop_ns = get_current_cpu_time_ns().unwrap_or(current_cpu_time_ns);
+        let blocking_cpu_time_ns =
+            BlockingScopeCPUUsage::get_cpu_usage_ns_and_reset(&mut op_state.borrow_mut());
+
+        let diff_cpu_time_ns = cpu_time_after_drop_ns - current_cpu_time_ns;
+
+        *accumulated_cpu_time_ns += diff_cpu_time_ns;
+        *accumulated_cpu_time_ns += blocking_cpu_time_ns;
+
+        send_cpu_metrics_fn(CPUUsageMetrics::Leave(CPUUsage {
+            accumulated: *accumulated_cpu_time_ns,
+            diff: diff_cpu_time_ns,
+        }));
+
+        debug!(
+            accumulated_cpu_time_ms = *accumulated_cpu_time_ns / 1_000_000,
+            blocking_cpu_time_ms = blocking_cpu_time_ns / 1_000_000,
+        );
+    })
+}
+
+fn terminate_execution_if_cancelled(
+    isolate: &mut v8::Isolate,
+    token: CancellationToken,
+) -> TerminateExecutionIfCancelledReturnType {
+    extern "C" fn interrupt_fn(isolate: &mut v8::Isolate, _: *mut std::ffi::c_void) {
+        let _ = isolate.terminate_execution();
+    }
+
+    let handle = isolate.thread_safe_handle();
+    let cancel_task_token = CancellationToken::new();
+    let request_interrupt_fn = move || {
+        let _ = handle.request_interrupt(interrupt_fn, std::ptr::null_mut());
+    };
+
+    drop(base_rt::SUPERVISOR_RT.spawn({
+        let cancel_task_token = cancel_task_token.clone();
+
+        async move {
+            if token.is_cancelled() {
+                request_interrupt_fn();
+            } else {
+                tokio::select! {
+                    _ = token.cancelled_owned() => {
+                        request_interrupt_fn();
+                    }
+
+                    _ = cancel_task_token.cancelled_owned() => {}
+                }
+            }
+        }
+    }));
+
+    scopeguard::guard(
+        cancel_task_token,
+        Box::new(|v| {
+            v.cancel();
+        }),
+    )
 }
 
 fn set_v8_flags() {
@@ -959,13 +1826,16 @@ extern "C" fn mem_check_gc_prologue_callback_fn(
 #[cfg(test)]
 mod test {
     use crate::deno_runtime::DenoRuntime;
-    use crate::rt_worker::worker::DuplexStreamEntry;
+    use crate::worker::{DuplexStreamEntry, WorkerBuilder};
     use anyhow::Context;
     use deno_config::JsxImportSourceConfig;
     use deno_core::error::AnyError;
+    use deno_core::v8::GetPropertyNamesArgs;
     use deno_core::{serde_json, serde_v8, v8, FastString, ModuleCodeString, PollEventLoopOptions};
-    use sb_graph::emitter::EmitterFactory;
-    use sb_graph::{generate_binary_eszip, EszipPayloadKind};
+    use fs::s3_fs::S3FsConfig;
+    use fs::tmp_fs::TmpFsConfig;
+    use graph::emitter::EmitterFactory;
+    use graph::{generate_binary_eszip, EszipPayloadKind};
     use sb_workers::context::{
         MainWorkerRuntimeOpts, UserWorkerMsgs, UserWorkerRuntimeOpts, WorkerContextInitOpts,
         WorkerRuntimeOpts,
@@ -974,7 +1844,6 @@ mod test {
     use serde::Serialize;
     use serial_test::serial;
     use std::collections::HashMap;
-    use std::fs;
     use std::fs::File;
     use std::io::Write;
     use std::marker::PhantomData;
@@ -986,6 +1855,7 @@ mod test {
     use url::Url;
 
     use super::GetRuntimeContext;
+    use super::RunOptionsBuilder;
 
     impl<RuntimeContext> DenoRuntime<RuntimeContext> {
         fn to_value_mut<T>(&mut self, global_value: &v8::Global<v8::Value>) -> Result<T, AnyError>
@@ -1006,6 +1876,8 @@ mod test {
         worker_runtime_conf: Option<WorkerRuntimeOpts>,
         static_patterns: Vec<String>,
         jsx_import_source_config: Option<JsxImportSourceConfig>,
+        s3_fs_config: Option<S3FsConfig>,
+        tmp_fs_config: Option<TmpFsConfig>,
         _phantom_context: PhantomData<C>,
     }
 
@@ -1027,6 +1899,8 @@ mod test {
                 worker_runtime_conf: self.worker_runtime_conf,
                 static_patterns: self.static_patterns,
                 jsx_import_source_config: self.jsx_import_source_config,
+                s3_fs_config: self.s3_fs_config,
+                tmp_fs_config: self.tmp_fs_config,
                 _phantom_context: PhantomData,
             }
         }
@@ -1044,46 +1918,53 @@ mod test {
                 worker_runtime_conf,
                 static_patterns,
                 jsx_import_source_config,
+                s3_fs_config,
+                tmp_fs_config,
                 _phantom_context,
             } = self;
 
             let (worker_pool_tx, _) = mpsc::unbounded_channel::<UserWorkerMsgs>();
 
             DenoRuntime::new(
-                WorkerContextInitOpts {
-                    maybe_eszip: eszip,
-                    service_path: path
-                        .map(PathBuf::from)
-                        .unwrap_or(PathBuf::from("./test_cases/main")),
+                WorkerBuilder::new(
+                    WorkerContextInitOpts {
+                        maybe_eszip: eszip,
+                        service_path: path
+                            .map(PathBuf::from)
+                            .unwrap_or(PathBuf::from("./test_cases/main")),
 
-                    conf: {
-                        if let Some(conf) = worker_runtime_conf {
-                            conf
-                        } else {
-                            WorkerRuntimeOpts::MainWorker(MainWorkerRuntimeOpts {
-                                worker_pool_tx,
-                                shared_metric_src: None,
-                                event_worker_metric_src: None,
-                            })
-                        }
+                        conf: {
+                            if let Some(conf) = worker_runtime_conf {
+                                conf
+                            } else {
+                                WorkerRuntimeOpts::MainWorker(MainWorkerRuntimeOpts {
+                                    worker_pool_tx,
+                                    shared_metric_src: None,
+                                    event_worker_metric_src: None,
+                                })
+                            }
+                        },
+
+                        maybe_entrypoint: None,
+                        maybe_decorator: None,
+                        maybe_module_code: None,
+
+                        no_module_cache: false,
+                        env_vars: env_vars.unwrap_or_default(),
+
+                        static_patterns,
+                        maybe_jsx_import_source_config: jsx_import_source_config,
+
+                        timing: None,
+                        import_map_path: None,
+
+                        maybe_s3_fs_config: s3_fs_config,
+                        maybe_tmp_fs_config: tmp_fs_config,
                     },
-
-                    maybe_entrypoint: None,
-                    maybe_decorator: None,
-                    maybe_module_code: None,
-
-                    no_module_cache: false,
-                    env_vars: env_vars.unwrap_or_default(),
-
-                    static_patterns,
-                    maybe_jsx_import_source_config: jsx_import_source_config,
-
-                    events_rx: None,
-                    timing: None,
-
-                    import_map_path: None,
-                },
-                None,
+                    Arc::default(),
+                )
+                .build()
+                .unwrap(),
             )
             .await
             .unwrap()
@@ -1123,6 +2004,12 @@ mod test {
             self
         }
 
+        #[allow(unused)]
+        fn set_s3_fs_config(mut self, config: S3FsConfig) -> Self {
+            let _ = self.s3_fs_config.insert(config);
+            self
+        }
+
         fn set_jsx_import_source_config(mut self, config: JsxImportSourceConfig) -> Self {
             let _ = self.jsx_import_source_config.insert(config);
             self
@@ -1142,36 +2029,52 @@ mod test {
         }
     }
 
+    struct WithSyncFileAPI;
+
+    impl GetRuntimeContext for WithSyncFileAPI {
+        fn get_extra_context() -> impl Serialize {
+            serde_json::json!({
+                "useReadSyncFileAPI": true,
+            })
+        }
+    }
+
     #[tokio::test]
     #[serial]
     async fn test_module_code_no_eszip() {
         let (worker_pool_tx, _) = mpsc::unbounded_channel::<UserWorkerMsgs>();
 
         DenoRuntime::<()>::new(
-            WorkerContextInitOpts {
-                service_path: PathBuf::from("./test_cases/"),
-                no_module_cache: false,
-                import_map_path: None,
-                env_vars: Default::default(),
-                events_rx: None,
-                timing: None,
-                maybe_eszip: None,
-                maybe_entrypoint: None,
-                maybe_decorator: None,
-                maybe_module_code: Some(FastString::from(String::from(
-                    "Deno.serve((req) => new Response('Hello World'));",
-                ))),
-                conf: {
-                    WorkerRuntimeOpts::MainWorker(MainWorkerRuntimeOpts {
-                        worker_pool_tx,
-                        shared_metric_src: None,
-                        event_worker_metric_src: None,
-                    })
+            WorkerBuilder::new(
+                WorkerContextInitOpts {
+                    service_path: PathBuf::from("./test_cases/"),
+                    no_module_cache: false,
+                    import_map_path: None,
+                    env_vars: Default::default(),
+                    timing: None,
+                    maybe_eszip: None,
+                    maybe_entrypoint: None,
+                    maybe_decorator: None,
+                    maybe_module_code: Some(FastString::from(String::from(
+                        "Deno.serve((req) => new Response('Hello World'));",
+                    ))),
+                    conf: {
+                        WorkerRuntimeOpts::MainWorker(MainWorkerRuntimeOpts {
+                            worker_pool_tx,
+                            shared_metric_src: None,
+                            event_worker_metric_src: None,
+                        })
+                    },
+                    static_patterns: vec![],
+
+                    maybe_jsx_import_source_config: None,
+                    maybe_s3_fs_config: None,
+                    maybe_tmp_fs_config: None,
                 },
-                static_patterns: vec![],
-                maybe_jsx_import_source_config: None,
-            },
-            None,
+                Arc::default(),
+            )
+            .build()
+            .unwrap(),
         )
         .await
         .expect("It should not panic");
@@ -1187,36 +2090,42 @@ mod test {
             .unwrap();
         let path_buf = PathBuf::from("./test_cases/eszip-source-test.ts");
         let emitter_factory = Arc::new(EmitterFactory::new());
-        let bin_eszip = generate_binary_eszip(path_buf, emitter_factory.clone(), None, None)
+        let bin_eszip = generate_binary_eszip(path_buf, emitter_factory.clone(), None, None, None)
             .await
             .unwrap();
-        fs::remove_file("./test_cases/eszip-source-test.ts").unwrap();
+        std::fs::remove_file("./test_cases/eszip-source-test.ts").unwrap();
 
         let eszip_code = bin_eszip.into_bytes();
 
         let runtime = DenoRuntime::<()>::new(
-            WorkerContextInitOpts {
-                service_path: PathBuf::from("./test_cases/"),
-                no_module_cache: false,
-                import_map_path: None,
-                env_vars: Default::default(),
-                events_rx: None,
-                timing: None,
-                maybe_eszip: Some(EszipPayloadKind::VecKind(eszip_code)),
-                maybe_entrypoint: None,
-                maybe_decorator: None,
-                maybe_module_code: None,
-                conf: {
-                    WorkerRuntimeOpts::MainWorker(MainWorkerRuntimeOpts {
-                        worker_pool_tx,
-                        shared_metric_src: None,
-                        event_worker_metric_src: None,
-                    })
+            WorkerBuilder::new(
+                WorkerContextInitOpts {
+                    service_path: PathBuf::from("./test_cases/"),
+                    no_module_cache: false,
+                    import_map_path: None,
+                    env_vars: Default::default(),
+                    timing: None,
+                    maybe_eszip: Some(EszipPayloadKind::VecKind(eszip_code)),
+                    maybe_entrypoint: None,
+                    maybe_decorator: None,
+                    maybe_module_code: None,
+                    conf: {
+                        WorkerRuntimeOpts::MainWorker(MainWorkerRuntimeOpts {
+                            worker_pool_tx,
+                            shared_metric_src: None,
+                            event_worker_metric_src: None,
+                        })
+                    },
+                    static_patterns: vec![],
+
+                    maybe_jsx_import_source_config: None,
+                    maybe_s3_fs_config: None,
+                    maybe_tmp_fs_config: None,
                 },
-                static_patterns: vec![],
-                maybe_jsx_import_source_config: None,
-            },
-            None,
+                Arc::default(),
+            )
+            .build()
+            .unwrap(),
         )
         .await;
 
@@ -1233,8 +2142,8 @@ mod test {
                 "<anon>",
                 ModuleCodeString::from(
                     r#"
-            globalThis.isTenEven;
-        "#
+                        globalThis.isTenEven;
+                    "#
                     .to_string(),
                 ),
             )
@@ -1252,35 +2161,40 @@ mod test {
         let file = PathBuf::from("./test_cases/eszip-silly-test/index.ts");
         let service_path = PathBuf::from("./test_cases/eszip-silly-test");
         let emitter_factory = Arc::new(EmitterFactory::new());
-        let binary_eszip = generate_binary_eszip(file, emitter_factory.clone(), None, None)
+        let binary_eszip = generate_binary_eszip(file, emitter_factory.clone(), None, None, None)
             .await
             .unwrap();
 
         let eszip_code = binary_eszip.into_bytes();
-
         let runtime = DenoRuntime::<()>::new(
-            WorkerContextInitOpts {
-                service_path,
-                no_module_cache: false,
-                import_map_path: None,
-                env_vars: Default::default(),
-                events_rx: None,
-                timing: None,
-                maybe_eszip: Some(EszipPayloadKind::VecKind(eszip_code)),
-                maybe_entrypoint: None,
-                maybe_decorator: None,
-                maybe_module_code: None,
-                conf: {
-                    WorkerRuntimeOpts::MainWorker(MainWorkerRuntimeOpts {
-                        worker_pool_tx,
-                        shared_metric_src: None,
-                        event_worker_metric_src: None,
-                    })
+            WorkerBuilder::new(
+                WorkerContextInitOpts {
+                    service_path,
+                    no_module_cache: false,
+                    import_map_path: None,
+                    env_vars: Default::default(),
+                    timing: None,
+                    maybe_eszip: Some(EszipPayloadKind::VecKind(eszip_code)),
+                    maybe_entrypoint: None,
+                    maybe_decorator: None,
+                    maybe_module_code: None,
+                    conf: {
+                        WorkerRuntimeOpts::MainWorker(MainWorkerRuntimeOpts {
+                            worker_pool_tx,
+                            shared_metric_src: None,
+                            event_worker_metric_src: None,
+                        })
+                    },
+                    static_patterns: vec![],
+
+                    maybe_jsx_import_source_config: None,
+                    maybe_s3_fs_config: None,
+                    maybe_tmp_fs_config: None,
                 },
-                static_patterns: vec![],
-                maybe_jsx_import_source_config: None,
-            },
-            None,
+                Arc::default(),
+            )
+            .build()
+            .unwrap(),
         )
         .await;
 
@@ -1297,8 +2211,8 @@ mod test {
                 "<anon>",
                 ModuleCodeString::from(
                     r#"
-            globalThis.isTenEven;
-        "#
+                        globalThis.isTenEven;
+                    "#
                     .to_string(),
                 ),
             )
@@ -1321,17 +2235,19 @@ mod test {
             let global = context.global(inner_scope);
             let edge_runtime_key: v8::Local<v8::Value> =
                 serde_v8::to_v8(inner_scope, "EdgeRuntime").unwrap();
-            assert!(!global
-                .get(inner_scope, edge_runtime_key)
-                .unwrap()
-                .is_undefined(),);
+
+            let edge_runtime_ns = global.get(inner_scope, edge_runtime_key).unwrap();
+
+            assert!(!edge_runtime_ns.is_undefined());
         }
     }
 
-    // User Runtime Should not have access to EdgeRuntime
+    // User Runtime can access EdgeRuntime, but only with specific APIs.
     #[tokio::test]
     #[serial]
     async fn test_user_runtime_creation() {
+        let allowed_apis = vec!["waitUntil"];
+
         let mut runtime = RuntimeBuilder::new()
             .set_worker_runtime_conf(WorkerRuntimeOpts::UserWorker(Default::default()))
             .build()
@@ -1344,17 +2260,43 @@ mod test {
             let global = context.global(inner_scope);
             let edge_runtime_key: v8::Local<v8::Value> =
                 serde_v8::to_v8(inner_scope, "EdgeRuntime").unwrap();
-            assert!(global
+
+            let edge_runtime_ns = global
                 .get(inner_scope, edge_runtime_key)
                 .unwrap()
-                .is_undefined(),);
+                .to_object(inner_scope)
+                .unwrap();
+
+            let edge_runtime_ns_keys = edge_runtime_ns
+                .get_property_names(
+                    inner_scope,
+                    GetPropertyNamesArgs {
+                        mode: v8::KeyCollectionMode::OwnOnly,
+                        index_filter: v8::IndexFilter::SkipIndices,
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+
+            assert_eq!(edge_runtime_ns_keys.length() as usize, allowed_apis.len());
+
+            for api in allowed_apis {
+                let key = serde_v8::to_v8(inner_scope, api).unwrap();
+                let obj = edge_runtime_ns.get(inner_scope, key).unwrap();
+
+                assert!(!obj.is_undefined());
+            }
         }
     }
 
     #[tokio::test]
     #[serial]
     async fn test_main_rt_fs() {
-        let mut main_rt = RuntimeBuilder::new().set_std_env().build().await;
+        let mut main_rt = RuntimeBuilder::new()
+            .set_std_env()
+            .set_context::<WithSyncFileAPI>()
+            .build()
+            .await;
 
         let global_value_deno_read_file_script = main_rt
             .js_runtime
@@ -1362,8 +2304,8 @@ mod test {
                 "<anon>",
                 ModuleCodeString::from(
                     r#"
-            Deno.readTextFileSync("./test_cases/readFile/hello_world.json");
-        "#
+                        Deno.readTextFileSync("./test_cases/readFile/hello_world.json");
+                    "#
                     .to_string(),
                 ),
             )
@@ -1404,8 +2346,8 @@ mod test {
                 "<anon>",
                 ModuleCodeString::from(
                     r#"
-           globalThis.hello;
-        "#
+                        globalThis.hello;
+                    "#
                     .to_string(),
                 ),
             )
@@ -1450,6 +2392,7 @@ mod test {
         let mut user_rt = RuntimeBuilder::new()
             .set_worker_runtime_conf(WorkerRuntimeOpts::UserWorker(Default::default()))
             .add_static_pattern("./test_cases/**/*.md")
+            .set_context::<WithSyncFileAPI>()
             .build()
             .await;
 
@@ -1488,21 +2431,21 @@ mod test {
                 "<anon>",
                 ModuleCodeString::from(
                     r#"
-            // Should not be able to set
-            const data = {
-                gid: Deno.gid(),
-                uid: Deno.uid(),
-                hostname: Deno.hostname(),
-                loadavg: Deno.loadavg(),
-                osUptime: Deno.osUptime(),
-                osRelease: Deno.osRelease(),
-                systemMemoryInfo: Deno.systemMemoryInfo(),
-                consoleSize: Deno.consoleSize(),
-                version: [Deno.version.deno, Deno.version.v8, Deno.version.typescript],
-                networkInterfaces: Deno.networkInterfaces()
-            };
-            data;
-        "#
+                        // Should not be able to set
+                        const data = {
+                            gid: Deno.gid(),
+                            uid: Deno.uid(),
+                            hostname: Deno.hostname(),
+                            loadavg: Deno.loadavg(),
+                            osUptime: Deno.osUptime(),
+                            osRelease: Deno.osRelease(),
+                            systemMemoryInfo: Deno.systemMemoryInfo(),
+                            consoleSize: Deno.consoleSize(),
+                            version: [Deno.version.deno, Deno.version.v8, Deno.version.typescript],
+                            networkInterfaces: Deno.networkInterfaces()
+                        };
+                        data;
+                    "#
                     .to_string(),
                 ),
             )
@@ -1582,9 +2525,9 @@ mod test {
             "<anon>",
             ModuleCodeString::from(
                 r#"
-            let cmd = new Deno.Command("", {});
-            cmd.outputSync();
-        "#
+                    let cmd = new Deno.Command("", {});
+                    cmd.outputSync();
+                "#
                 .to_string(),
             ),
         );
@@ -1615,9 +2558,9 @@ mod test {
                 "<anon>",
                 ModuleCodeString::from(
                     r#"
-            // Should not be able to set
-            Deno.env.set("Supa_Test", "Supa_Value");
-        "#
+                        // Should not be able to set
+                        Deno.env.set("Supa_Test", "Supa_Value");
+                    "#
                     .to_string(),
                 ),
             )
@@ -1633,9 +2576,9 @@ mod test {
                 "<anon>",
                 ModuleCodeString::from(
                     r#"
-            // Should not be able to set
-            Deno.env.get("Supa_Test");
-        "#
+                        // Should not be able to set
+                        Deno.env.get("Supa_Test");
+                    "#
                     .to_string(),
                 ),
             )
@@ -1652,9 +2595,9 @@ mod test {
                 "<anon>",
                 ModuleCodeString::from(
                     r#"
-            // Should not be able to set
-            Deno.env.get("Supa_Test");
-        "#
+                        // Should not be able to set
+                        Deno.env.get("Supa_Test");
+                    "#
                     .to_string(),
                 ),
             )
@@ -1704,7 +2647,15 @@ mod test {
                 .await;
 
         let (_tx, duplex_stream_rx) = mpsc::unbounded_channel::<DuplexStreamEntry>();
-        let (result, _) = user_rt.run(duplex_stream_rx, None, None).await;
+        let (result, _) = user_rt
+            .run(
+                RunOptionsBuilder::new()
+                    .wait_termination_request_token(false)
+                    .stream_rx(duplex_stream_rx)
+                    .build()
+                    .unwrap(),
+            )
+            .await;
 
         assert!(result.is_ok(), "expected no errors");
 
@@ -1721,7 +2672,15 @@ mod test {
                 .await;
 
         let (_tx, duplex_stream_rx) = mpsc::unbounded_channel::<DuplexStreamEntry>();
-        let (result, _) = user_rt.run(duplex_stream_rx, None, None).await;
+        let (result, _) = user_rt
+            .run(
+                RunOptionsBuilder::new()
+                    .wait_termination_request_token(false)
+                    .stream_rx(duplex_stream_rx)
+                    .build()
+                    .unwrap(),
+            )
+            .await;
 
         match result {
             Err(err) => {
@@ -1747,6 +2706,7 @@ mod test {
             worker_timeout_ms,
             static_patterns,
         )
+        .set_context::<WithSyncFileAPI>()
         .build()
         .await;
 
@@ -1754,18 +2714,26 @@ mod test {
         let handle = user_rt.js_runtime.v8_isolate().thread_safe_handle();
 
         user_rt.add_memory_limit_callback(move |_| {
-            handle.terminate_execution();
+            assert!(handle.terminate_execution());
             waker.wake();
             callback_tx.send(()).unwrap();
         });
 
         let wait_fut = async move {
-            let (result, _) = user_rt.run(duplex_stream_rx, None, None).await;
+            let (result, _) = user_rt
+                .run(
+                    RunOptionsBuilder::new()
+                        .wait_termination_request_token(false)
+                        .stream_rx(duplex_stream_rx)
+                        .build()
+                        .unwrap(),
+                )
+                .await;
 
-            assert_eq!(
-                result.unwrap_err().to_string(),
-                "event loop error: Uncaught Error: execution terminated"
-            );
+            assert!(result
+                .unwrap_err()
+                .to_string()
+                .ends_with("Error: execution terminated"));
 
             callback_rx.recv().await.unwrap();
 
@@ -1843,8 +2811,9 @@ mod test {
         struct Ctx;
 
         impl GetRuntimeContext for Ctx {
-            fn get_runtime_context() -> impl Serialize {
+            fn get_extra_context() -> impl Serialize {
                 serde_json::json!({
+                    "useReadSyncFileAPI": true,
                     "shouldBootstrapMockFnThrowError": true,
                 })
             }
@@ -1862,7 +2831,17 @@ mod test {
 
         let (_tx, duplex_stream_rx) = mpsc::unbounded_channel();
 
-        user_rt.run(duplex_stream_rx, None, None).await.0.unwrap();
+        user_rt
+            .run(
+                RunOptionsBuilder::new()
+                    .wait_termination_request_token(false)
+                    .stream_rx(duplex_stream_rx)
+                    .build()
+                    .unwrap(),
+            )
+            .await
+            .0
+            .unwrap();
     }
 
     #[tokio::test]
@@ -1880,6 +2859,16 @@ mod test {
 
         let (_tx, duplex_stream_rx) = mpsc::unbounded_channel();
 
-        user_rt.run(duplex_stream_rx, None, None).await.0.unwrap();
+        user_rt
+            .run(
+                RunOptionsBuilder::new()
+                    .wait_termination_request_token(false)
+                    .stream_rx(duplex_stream_rx)
+                    .build()
+                    .unwrap(),
+            )
+            .await
+            .0
+            .unwrap();
     }
 }
