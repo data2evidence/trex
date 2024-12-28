@@ -19,6 +19,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build
         run: cargo build --profile release
+      - name: cp
+        run: cp target/release/edge-runtime trex
       - name: Update version
         run: jq --arg v "-$(date +%s)-$GITHUB_SHA" '.version+=$v' package.json > tmppkg; mv tmppkg package.json
       - name: Use Node.js
