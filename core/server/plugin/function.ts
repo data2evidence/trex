@@ -10,7 +10,7 @@ const headers = new Headers({
 });
 
 
-async function _callInit (servicePath: string, imports, fnEnv) {
+async function _callInit (servicePath: string, imports, fnEnv, eszip, dir) {
 	const myenv = Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[fnEnv])
 	const _myenv =  Object.keys(myenv).map((k) => [k, typeof(myenv[k])==="string"? myenv[k]:JSON.stringify(myenv[k])]);
 	const watch = env.WATCH[fnEnv] || false; 
@@ -21,7 +21,12 @@ async function _callInit (servicePath: string, imports, fnEnv) {
 		cpuTimeSoftLimitMs: 100000, cpuTimeHardLimitMs: 200000,
 		decoratorType: "typescript_with_metadata" 
 	}
+	if(eszip) {
+		logger.log(`ESZIP ${dir}${eszip}`)
+		options["maybeEszip"] = await Deno.readFile(`${dir}${eszip}`);
+	}
 	try { 
+		console.log(options);
 		const worker = await Trex.userWorkers.create(options);
 	} catch (e) {
 		logger.error(e);
@@ -34,7 +39,7 @@ async function _callInit (servicePath: string, imports, fnEnv) {
 	return;
 }
     
-async function _callWorker (req: any, servicePath: string, imports, fncfg) {
+async function _callWorker (req: any, servicePath: string, imports, fncfg, dir) {
 	const myenv = Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[fncfg.env], {DB_CREDENTIALS__PRIVATE_KEY: env.DB_CREDENTIALS__PRIVATE_KEY})
 	const _myenv = Object.keys(myenv).map((k) => [k, typeof(myenv[k])==="string"? myenv[k]:JSON.stringify(myenv[k])]);
 	const watch = env.WATCH[fncfg.env] || false; 
@@ -45,6 +50,11 @@ async function _callWorker (req: any, servicePath: string, imports, fncfg) {
 		forceCreate: env._FORCE_CREATE || watch, netAccessDisabled: false, 
 		cpuTimeSoftLimitMs: 100000, cpuTimeHardLimitMs: 200000,
 		decoratorType: "typescript_with_metadata" 
+	}
+	if(fncfg.eszip) {
+		logger.log(`ESZIP $${dir}${fncfg.eszip}`)
+
+		options["maybeEszip"] = await Deno.readFile(`${dir}${fncfg.eszip}`);
 	}
 	try { 
 		const worker = await Trex.userWorkers.create(options);
@@ -71,10 +81,9 @@ async function _callWorker (req: any, servicePath: string, imports, fncfg) {
 	}
 };
 
-function _addFunction(app, url, path, imports, fncfg) {
-	app.all(url+"/*", authn, authz, (c) =>  _callWorker(c.req.raw, `${path}`, imports, fncfg));
+function _addFunction(app, url, path, imports, fncfg, dir) {
+	app.all(url+"/*", authn, authz, (c) =>  _callWorker(c.req.raw, `${path}`, imports, fncfg, dir));
 }
-
 
 function _addService(app, url, service, rmsrc) {
 	const service_url = env.SERVICE_ROUTES[service];
@@ -88,10 +97,10 @@ function _addService(app, url, service, rmsrc) {
 	});
 }
 
-async function _addInit(path, imports, env, waitforurl) {
+async function _addInit(path, imports, env, eszip, dir, waitforurl) {
 	if(waitforurl)
 		await waitfor(waitforurl);
-	_callInit(`${path}`, imports, env);
+	_callInit(`${path}`, imports, env, eszip, dir);
 }
 
 export async function addFunctionPlugin(app, value, dir) {
@@ -102,6 +111,7 @@ export async function addFunctionPlugin(app, value, dir) {
                 _addInit(`${dir}${r.function}`,
                     r.imports?  `${dir}${r.imports}` : null,
                     r.env,
+					r.eszip ? r.eszip : null, dir,
                     r.waitfor); //Object.keys(envVarsObj).map((k) => [k, envVarsObj[k]])
                 if (r.delay) await new Promise(resolve => setTimeout(resolve, r.delay));
                 logger.log(`add init fn done @ ${dir}${r.function}`)
@@ -135,7 +145,7 @@ export async function addFunctionPlugin(app, value, dir) {
             logger.log(`add fn ${r.source} @ ${dir}${r.function}`)
             _addFunction(app, r.source, `${dir}${r.function}`, 
             r.imports?  `${dir}${r.imports}` : null, 
-            r);
+            r, dir);
         } else if (r.service) {  
             logger.log(`add svc ${r.source} @ ${r.service}`)
             _addService(app, r.source, r.service, r.rmsrc);
