@@ -82,11 +82,22 @@ export class Plugins {
 	}
 
 	async addPluginPackage(app, name, force = false) {
-		let pkgname = name
-		if(name.indexOf("@")<0 && env.PLUGINS_API_VERSION)
-			pkgname = `${name}@${env.PLUGINS_API_VERSION}`
-		else 
-			name = name.split("@")[0]
+		let pkgname = "";
+		let pkgurl = "";
+		if(name.indexOf(":")<0) {
+			pkgname = name
+			if(name.indexOf("@")<0 && env.PLUGINS_API_VERSION)
+				pkgname = `${name}@${env.PLUGINS_API_VERSION}`
+			else 
+				name = name.split("@")[0]
+
+			pkgurl = `@${env.GH_ORG}/${pkgname}`
+		} else {
+			pkgurl = name
+			name = pkgurl.split("/").pop()?.split(".")[0]
+			pkgname = name
+		}
+
 		const _plugin = await this.isInstalled(name);
 		let pkg = {};
 		if(_plugin && !force) {
@@ -94,7 +105,7 @@ export class Plugins {
 			pkg = {name: _plugin.name, version: _plugin.version, trex: _plugin.payload}
 		} else {
 			
-			await Trex.installPlugin(`@${env.GH_ORG}/${pkgname}`, `${env.PLUGINS_PATH}`)
+			await Trex.installPlugin(pkgurl, `${env.PLUGINS_PATH}`)
 			pkg = JSON.parse(await Deno.readTextFile(`${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/package.json`));
 		}
 		await this.addPlugin(app, `${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/`, pkg, name);
