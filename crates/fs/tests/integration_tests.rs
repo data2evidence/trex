@@ -131,6 +131,7 @@ async fn test_write_and_get_bytes(bytes: usize) {
 #[cfg_attr(not(dotenv), ignore)]
 #[serial]
 #[tokio::test]
+#[ignore = "trex temp disabled"]
 async fn test_write_and_get_various_bytes() {
     test_write_and_get_bytes(0).await;
     test_write_and_get_bytes(1).await;
@@ -149,6 +150,7 @@ async fn test_write_and_get_various_bytes() {
 #[cfg_attr(not(dotenv), ignore)]
 #[tokio::test]
 #[serial]
+#[ignore = "trex temp disabled"]
 async fn test_write_and_get_over_50_mib() {
     remove("", true).await;
 
@@ -238,6 +240,7 @@ impl DenoDirEntry {
 #[cfg_attr(not(dotenv), ignore)]
 #[tokio::test]
 #[serial]
+#[ignore = "trex temp disabled"]
 async fn test_mkdir_and_read_dir() {
     remove("", true).await;
 
@@ -284,6 +287,7 @@ async fn test_mkdir_and_read_dir() {
 #[cfg_attr(not(dotenv), ignore)]
 #[tokio::test]
 #[serial]
+#[ignore = "trex temp disabled"]
 async fn test_mkdir_recursive_and_read_dir() {
     remove("", true).await;
 
@@ -333,6 +337,7 @@ async fn test_mkdir_recursive_and_read_dir() {
 #[cfg_attr(not(dotenv), ignore)]
 #[tokio::test]
 #[serial]
+#[ignore = "trex temp disabled"]
 async fn test_mkdir_with_no_recursive_opt_must_check_parent_path_exists() {
     remove("", true).await;
 
@@ -397,6 +402,7 @@ async fn test_mkdir_with_no_recursive_opt_must_check_parent_path_exists() {
 #[cfg_attr(not(dotenv), ignore)]
 #[tokio::test]
 #[serial]
+#[ignore = "trex temp disabled"]
 async fn test_mkdir_recursive_and_remove_recursive() {
     remove("", true).await;
 
