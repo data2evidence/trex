@@ -27,7 +27,7 @@ use deno_tls::rustls::RootCertStore;
 use deno_tls::RootCertStoreProvider;
 use fs::prefix_fs::PrefixFs;
 use fs::s3_fs::S3Fs;
-use fs::static_fs::StaticFs;
+//use fs::static_fs::StaticFs;
 use fs::tmp_fs::TmpFs;
 use futures_util::future::poll_fn;
 use futures_util::task::AtomicWaker;
@@ -36,8 +36,6 @@ use log::error;
 use once_cell::sync::{Lazy, OnceCell};
 use sb_core::http::sb_core_http;
 use sb_core::http_start::sb_core_http_start;
-use sb_core::util::sync::AtomicFlag;
-// use sb_fs::static_fs::StaticFs;
 use scopeguard::ScopeGuard;
 use serde::Serialize;
 use std::borrow::Cow;
@@ -658,18 +656,17 @@ where
             };
 
         let file_system = build_file_system_fn(
-        /*TODO: TREX ENABLE FILE ACCESS
-        if is_user_worker {
-            Arc::new(StaticFs::new(
-                static_files,
-                base_dir_path,
-                vfs_path,
-                vfs,
-                npm_snapshot,
-            ))
-        } else {*/
-            Arc::new(DenoCompileFileSystem::from_rc(vfs))
-        //}
+            /*TODO: TREX ENABLE FILE ACCESS
+            if is_user_worker {
+                Arc::new(StaticFs::new(
+                    static_files,
+                    base_dir_path,
+                    vfs_path,
+                    vfs,
+                    npm_snapshot,
+                ))
+            } else {*/
+            Arc::new(DenoCompileFileSystem::from_rc(vfs)), //}
         )?;
 
         /* NOTE(kallebysantos): Cache via SqliteBackedCache is disabled.
