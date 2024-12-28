@@ -28,7 +28,7 @@ use base::{
 };
 use base::{
     utils::test_utils::{
-        create_test_user_worker, test_user_runtime_opts, test_user_worker_pool_policy,
+        self, create_test_user_worker, test_user_runtime_opts, test_user_worker_pool_policy,
         TestBedBuilder,
     },
     worker::TerminationToken,
