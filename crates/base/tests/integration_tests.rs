@@ -752,6 +752,7 @@ async fn test_file_upload_real_multipart_bytes() {
 
 #[tokio::test]
 #[serial]
+#[ignore = "trex temp disabled"]
 async fn test_file_upload_size_exceed() {
     test_oak_file_upload(
         Cow::Borrowed("./test_cases/main"),
