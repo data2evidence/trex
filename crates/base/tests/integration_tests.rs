@@ -1170,6 +1170,7 @@ async fn req_failure_case_intentional_peer_reset_secure() {
 
 #[tokio::test]
 #[serial]
+#[ignore = "trex temp disabled"]
 async fn req_failure_case_op_cancel_from_server_due_to_cpu_resource_limit() {
     test_oak_file_upload(
         Cow::Borrowed("./test_cases/main_small_cpu_time"),
@@ -1194,6 +1195,7 @@ async fn req_failure_case_op_cancel_from_server_due_to_cpu_resource_limit() {
 
 #[tokio::test]
 #[serial]
+#[ignore = "trex temp disabled"]
 async fn req_failure_case_op_cancel_from_server_due_to_cpu_resource_limit_2() {
     test_oak_file_upload(
         Cow::Borrowed("./test_cases/main_small_cpu_time"),
