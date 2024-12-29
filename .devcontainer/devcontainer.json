@@ -2,17 +2,18 @@
   "name": "Rust",
   "build": {
     "dockerfile": "Dockerfile",
-    "context": "..",
-    "args": {
-      "ONNXRUNTIME_VERSION": "1.17.0"
-    }
+    "context": ".."
+  },
+  "containerEnv": {
+    "PATH": "${localEnv:PATH}:/deno/bin"
   },
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/jungaretti/features/make:1": {},
-    "ghcr.io/lee-orr/rusty-dev-containers/cargo-make:0": {}
+    "ghcr.io/jungaretti/features/make:1": {}
   },
   "runArgs": [
+    "--env-file",
+    ".env",
     "--rm",
     "--privileged",
     "--security-opt",
@@ -31,7 +32,8 @@
         "eamodio.gitlens",
         "ms-azuretools.vscode-docker",
         "ms-vscode.hexeditor",
-        "vadimcn.vscode-lldb"
+        "vadimcn.vscode-lldb",
+        "denoland.vscode-deno"
       ]
     }
   }

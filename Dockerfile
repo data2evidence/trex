@@ -1,33 +1,69 @@
 # syntax=docker/dockerfile:1.4
-FROM rust:1.77.2-bookworm as builder
+
+FROM rust:1.79.0-bookworm as builder
+
 ARG TARGETPLATFORM
-ARG GIT_V_VERSION
-ARG ONNXRUNTIME_VERSION=1.17.0
+ARG ONNXRUNTIME_VERSION
+ARG GIT_V_TAG
 ARG PROFILE=release
 ARG FEATURES
 
-RUN apt-get update && apt-get install -y llvm-dev libclang-dev clang cmake
+RUN apt-get update && apt-get install -y llvm-dev libclang-dev clang cmake binutils
+
 WORKDIR /usr/src/edge-runtime
 
-RUN --mount=type=cache,target=/usr/local/cargo/registry,id=${TARGETPLATFORM} \
-    cargo install cargo-strip
 COPY . .
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=${TARGETPLATFORM} --mount=type=cache,target=/usr/src/edge-runtime/target,id=${TARGETPLATFORM} \
-    GIT_V_TAG=${GIT_V_VERSION} cargo build --profile ${PROFILE} --features "${FEATURES}" && \
-    cargo strip && \
+    GIT_V_TAG=${GIT_V_TAG} cargo build --profile ${PROFILE} --features "${FEATURES}" && \
     mv /usr/src/edge-runtime/target/${PROFILE}/edge-runtime /root
 
-RUN ./scripts/install_onnx.sh $ONNXRUNTIME_VERSION $TARGETPLATFORM /root/libonnxruntime.so
-RUN ./scripts/download_models.sh
+RUN objcopy --compress-debug-sections \
+    --only-keep-debug \
+    /root/edge-runtime \
+    /root/edge-runtime.debug
+RUN objcopy --strip-debug \
+    --add-gnu-debuglink=/root/edge-runtime.debug \
+    /root/edge-runtime
 
 
-FROM debian:bookworm-slim
+# Application runtime without ONNX
+FROM debian:bookworm-slim as edge-runtime-base
+
 RUN apt-get update && apt-get install -y libssl-dev && rm -rf /var/lib/apt/lists/*
 RUN apt-get remove -y perl && apt-get autoremove -y
+
 COPY --from=builder /root/edge-runtime /usr/local/bin/edge-runtime
-COPY --from=builder /root/libonnxruntime.so /usr/local/bin/libonnxruntime.so
-COPY --from=builder /usr/src/edge-runtime/models /etc/sb_ai/models
-ENV ORT_DYLIB_PATH=/usr/local/bin/libonnxruntime.so
-ENV SB_AI_MODELS_DIR=/etc/sb_ai/models
+COPY --from=builder /root/edge-runtime.debug /usr/local/bin/edge-runtime.debug
+
+
+# ONNX Runtime provider
+# Application runtime with ONNX
+FROM builder as ort
+RUN ./scripts/install_onnx.sh $ONNXRUNTIME_VERSION linux $TARGETPLATFORM /root/onnxruntime
+
+
+# ONNX Runtime CUDA provider
+# Application runtime with ONNX CUDA
+FROM builder as ort-cuda
+RUN ./scripts/install_onnx.sh $ONNXRUNTIME_VERSION linux $TARGETPLATFORM /root/onnxruntime --gpu
+
+
+# With CUDA
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 as edge-runtime-cuda
+
+COPY --from=edge-runtime-base /usr/local/bin/edge-runtime /usr/local/bin/edge-runtime
+COPY --from=builder /root/edge-runtime.debug /usr/local/bin/edge-runtime.debug
+COPY --from=ort-cuda /root/onnxruntime/lib/libonnxruntime.so* /usr/lib
+
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+ENTRYPOINT ["edge-runtime"]
+
+
+# Base
+FROM edge-runtime-base as edge-runtime
+COPY --from=ort /root/onnxruntime/lib/libonnxruntime.so* /usr/lib
+
 ENTRYPOINT ["edge-runtime"]
