@@ -22,11 +22,10 @@ async function _callInit (servicePath: string, imports, fnEnv, eszip, dir) {
 		decoratorType: "typescript_with_metadata" 
 	}
 	if(eszip) {
-		logger.log(`ESZIP ${dir}${eszip}`)
+		logger.log(`ESZIP ${dir}${eszip} %%% ${options["importMapPath"]}`)
 		options["maybeEszip"] = await Deno.readFile(`${dir}${eszip}`);
 	}
 	try { 
-		console.log(options);
 		const worker = await Trex.userWorkers.create(options);
 	} catch (e) {
 		logger.error(e);
@@ -52,8 +51,7 @@ async function _callWorker (req: any, servicePath: string, imports, fncfg, dir) 
 		decoratorType: "typescript_with_metadata" 
 	}
 	if(fncfg.eszip) {
-		logger.log(`ESZIP $${dir}${fncfg.eszip}`)
-
+		logger.log(`ESZIP ${dir}${fncfg.eszip} %%% ${options["importMapPath"]}`)
 		options["maybeEszip"] = await Deno.readFile(`${dir}${fncfg.eszip}`);
 	}
 	try { 
@@ -109,7 +107,7 @@ export async function addFunctionPlugin(app, value, dir) {
             if(r.function) {
                 logger.log(`add init fn @ ${dir}${r.function}`)
                 _addInit(`${dir}${r.function}`,
-                    r.imports?  `${dir}${r.imports}` : null,
+                    r.imports?  (r.imports.indexOf(":")<0 ? `${dir}${r.imports}` : r.imports) : null,
                     r.env,
 					r.eszip ? r.eszip : null, dir,
                     r.waitfor); //Object.keys(envVarsObj).map((k) => [k, envVarsObj[k]])
@@ -144,7 +142,7 @@ export async function addFunctionPlugin(app, value, dir) {
         if(r.function) {
             logger.log(`add fn ${r.source} @ ${dir}${r.function}`)
             _addFunction(app, r.source, `${dir}${r.function}`, 
-            r.imports?  `${dir}${r.imports}` : null, 
+            r.imports?  (r.imports.indexOf(":")<0 ? `${dir}${r.imports}` : r.imports) : null,
             r, dir);
         } else if (r.service) {  
             logger.log(`add svc ${r.source} @ ${r.service}`)
