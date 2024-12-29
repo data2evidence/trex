@@ -2,7 +2,7 @@
   
 const function_path2 = `${Deno.cwd()}`
 console.log(function_path2)
-const trex = `${Deno.cwd()}/${Deno.args[0]}/target/release/edge-runtime`
+const trex = `${Deno.cwd()}/${Deno.args[0]}/trex`
 
 async function build(fn) {
     return await Promise.all(fn.map(async f => { 
