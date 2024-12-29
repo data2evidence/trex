@@ -11,13 +11,14 @@
     "watch": "mkdir -p ./cert ; echo \"$TLS__INTERNAL__CRT\" > ./cert/cert.pem & echo \"$TLS__INTERNAL__KEY\" > ./cert/key.pem & npx nodemon --watch core -e ts --exec ./trex start --tls 33000 -p 33001 --key ./cert/key.pem --cert ./cert/cert.pem --main-service ./core/server --event-worker ./core/event --inspect=0.0.0.0:9229"
   },
   "bin": {
-    "trex": "./build/trex.js"
+    "tbuild": "./scripts/build_plugin.sh"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@oven/bun-linux-x64-baseline": "^1.1.34",
-    "nodemon": "^3.1.4"
+    "nodemon": "^3.1.4",
+    "deno": "latest"
   }
 }
