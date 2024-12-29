@@ -1,4 +1,4 @@
-assests
+assets
 cert
 core
 crates
@@ -6,5 +6,5 @@ examples
 k6
 node_modules
 plugins
-scripts
+build
 target
