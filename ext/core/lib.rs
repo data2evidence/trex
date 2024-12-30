@@ -338,7 +338,7 @@ fn op_install_plugin(#[string] name: String, #[string] dir: String) {
             "-n",
             "no_name",
             "--node-modules-dir",
-            "node_modules"
+            "node_modules",
         ])
         .current_dir(dir)
         .status()
