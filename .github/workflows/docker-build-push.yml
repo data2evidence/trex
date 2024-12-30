@@ -16,7 +16,7 @@ jobs:
         include: 
           - AZ_REGISTRY_REPOSITORY: d2e-trex-base
             context: .
-            dockerfile: ./build/Dockerfile
+            dockerfile: ./Dockerfile.trex
 
     steps:
       - name: Free Disk Space (Ubuntu)
