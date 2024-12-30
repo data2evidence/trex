@@ -30,6 +30,8 @@ COPY core /usr/src/core
 CMD mkdir /usr/src/plugin
 COPY package.json.plugin /usr/src/plugin/package.json
 COPY bunfig.toml /usr/src/plugin/bunfig.toml
+COPY .npmrc /usr/src/plugin/.npmrc
+
 COPY package.json /usr/src
 COPY package-lock.json /usr/src
 

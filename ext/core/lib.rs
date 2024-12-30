@@ -329,14 +329,17 @@ fn op_runtime_memory_usage(scope: &mut v8::HandleScope) -> MemoryUsage {
 fn op_install_plugin(#[string] name: String, #[string] dir: String) {
     Command::new("npx")
         .args([
-            "bun",
+            "deno",
             "install",
+            &name,
+            "--global",
             "-f",
-            "--silent",
-            "--no-cache",
-            "--no-save",
+            "-q",
+            "-n",
+            "no_name",
+            "--node-modules-dir",
+            "node_modules",
         ])
-        .arg(name)
         .current_dir(dir)
         .status()
         .expect("failed to execute process");
