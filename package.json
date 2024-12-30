@@ -4,14 +4,15 @@
   "description": "",
   "main": "lib/trex.js",
   "scripts": {
-    "start": "mkdir -p ./cert ; echo \"$TLS__INTERNAL__CRT\" > ./cert/cert.pem & echo \"$TLS__INTERNAL__KEY\" > ./cert/key.pem & ./trex start --tls 33000 -p 33001 --key ./cert/key.pem --cert ./cert/cert.pem --main-service ./core/server --event-worker ./core/event",
+    "start": "mkdir -p ./cert ; echo \"$TLS__INTERNAL__CRT\" > ./cert/cert.pem & echo \"$TLS__INTERNAL__KEY\" > ./cert/key.pem & ./trex start --tls 33000 -p 33001 --key ./cert/key.pem --cert ./cert/cert.pem --main-service ./core/server/index.eszip --event-worker ./core/event/index.eszip",
     "start2": "deno run --allow-net --allow-env --allow-read --allow-sys core/server/index.ts",
-    "startdev": "mkdir -p ./cert ; echo \"$TLS__INTERNAL__CRT\" > ./cert/cert.pem & echo \"$TLS__INTERNAL__KEY\" > ./cert/key.pem & ./trex start --tls 33000 -p 33001 --key ./cert/key.pem --cert ./cert/cert.pem --main-service ./core/server --event-worker ./core/event --inspect=0.0.0.0:9229",
+    "startdev": "mkdir -p ./cert ; echo \"$TLS__INTERNAL__CRT\" > ./cert/cert.pem & echo \"$TLS__INTERNAL__KEY\" > ./cert/key.pem & ./trex start --tls 33000 -p 33001 --key ./cert/key.pem --cert ./cert/cert.pem --main-service ./core/server/index.eszip --event-worker ./core/event/index.eszip --inspect=0.0.0.0:9229",
     "health": "bun -e \"await fetch('https://localhost:33000/_internal/health', { tls: { rejectUnauthorized: false } });\"",
     "watch": "mkdir -p ./cert ; echo \"$TLS__INTERNAL__CRT\" > ./cert/cert.pem & echo \"$TLS__INTERNAL__KEY\" > ./cert/key.pem & npx nodemon --watch core -e ts --exec ./trex start --tls 33000 -p 33001 --key ./cert/key.pem --cert ./cert/cert.pem --main-service ./core/server --event-worker ./core/event --inspect=0.0.0.0:9229"
   },
   "bin": {
-    "tbuild": "./scripts/build_plugin.sh"
+    "tbuild": "./scripts/build_plugin.sh",
+    "trex_build": "./scripts/build_plugin.sh"
   },
   "keywords": [],
   "author": "",

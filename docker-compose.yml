@@ -2,7 +2,7 @@ services:
   trex:
     build:
       context: ./services/trex
-      dockerfile: build/Dockerfile
+      dockerfile: Dockerfile.trex
       target: development
     pull_policy: never
     command: npm run watch

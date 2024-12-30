@@ -1,5 +1,5 @@
 
-FROM rust:1.77.2-bookworm as builder
+FROM rust:1.79.0-bookworm AS builder
 ARG TARGETPLATFORM
 ARG GIT_V_VERSION
 ARG ONNXRUNTIME_VERSION=1.17.0
@@ -34,6 +34,9 @@ COPY package.json /usr/src
 COPY package-lock.json /usr/src
 
 RUN npm ci 
+
+RUN /usr/src/trex bundle --entrypoint /usr/src/core/server/index.ts --output /usr/src/core/server/index.eszip 
+RUN /usr/src/trex bundle --entrypoint /usr/src/core/event/index.ts --output /usr/src/core/event/index.eszip 
 
 # Allows usage of npx
 RUN ln -s /usr/src/node_modules/@oven/bun-linux-x64-baseline/bin/bun /usr/src/node_modules/.bin/bun
