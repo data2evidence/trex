@@ -311,8 +311,8 @@ export async function authz(c, next) {
           }
         } else {
           logger.error(`\x1b[0m\x1b[41m>>> NO datasetId defined in scope @ ${c.req.method} ${c.req.path}<<<\x1b[0m`)
-          logger.info(`\x1b[0m\x1b[41mTMP OVERWRITE STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}\x1b[0m`)
-          return next()
+          //logger.info(`\x1b[0m\x1b[41mTMP OVERWRITE STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}\x1b[0m`)
+          //return next()
         }
 
 
