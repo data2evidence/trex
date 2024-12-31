@@ -36,7 +36,7 @@ jobs:
           if [[ $GIT_CI_BRANCH_NAME == 'npmci' || $GIT_CI_BRANCH_NAME == 'develop' ]]; then 
             npm publish
           else 
-            npm publish
+            npm publish --dry-run
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
