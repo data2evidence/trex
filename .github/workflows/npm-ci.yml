@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: rm npmrc
+        run: rm .npmrc
       - name: Build
         run: cargo build --profile release
       - name: cp
@@ -34,7 +36,7 @@ jobs:
           if [[ $GIT_CI_BRANCH_NAME == 'npmci' || $GIT_CI_BRANCH_NAME == 'develop' ]]; then 
             npm publish
           else 
-            npm publish --dry-run
+            npm publish
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
