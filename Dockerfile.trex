@@ -27,6 +27,8 @@ RUN apt-get remove -y perl && apt-get autoremove -y
 WORKDIR /usr/src
 COPY --from=builder /root/edge-runtime /usr/src/trex
 COPY core /usr/src/core
+COPY package.json.plugin /usr/src/plugin/package.json
+COPY bunfig.toml /usr/src/plugin/bunfig.toml
 CMD mkdir /usr/src/plugin
 COPY .npmrc /usr/src/plugin/.npmrc
 
@@ -37,6 +39,9 @@ RUN npm ci
 
 RUN /usr/src/trex bundle --entrypoint /usr/src/core/server/index.ts --output /usr/src/core/server/index.eszip 
 RUN /usr/src/trex bundle --entrypoint /usr/src/core/event/index.ts --output /usr/src/core/event/index.eszip 
+
+# Allows usage of npx
+RUN ln -s /usr/src/node_modules/@oven/bun-linux-x64-baseline/bin/bun /usr/src/node_modules/.bin/bun
 
 CMD ["npm", "run", "start"]
 EXPOSE 33000
