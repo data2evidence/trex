@@ -105,7 +105,7 @@ export class Plugins {
 			pkg = {name: _plugin.name, version: _plugin.version, trex: _plugin.payload}
 		} else {
 			
-			await Trex.installPlugin("npm:"+pkgurl, `${env.PLUGINS_PATH}`)
+			await Trex.installPlugin(pkgurl, `${env.PLUGINS_PATH}`)
 			pkg = JSON.parse(await Deno.readTextFile(`${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/package.json`));
 		}
 		await this.addPlugin(app, `${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/`, pkg, name);
