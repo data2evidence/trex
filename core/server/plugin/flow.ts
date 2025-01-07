@@ -9,7 +9,10 @@ export async function addFlowPlugin(value) {
 			logger.error("Prefect URL not defined: skipping flow plugins");
 		}
 		await waitfor(env.PREFECT_HEALTH_CHECK);
-		
+		while(!await hasWorkerPool()) {
+			logger.log(`waiting for creation of worker pool ...`)
+			await new Promise(resolve => setTimeout(resolve, 3000));
+		}
 		if(value.flows)
 			value.flows.forEach(async f => {
 				const res = await fetch(`${env.PREFECT_API_URL}/flows/`, {
@@ -59,4 +62,22 @@ export async function addFlowPlugin(value) {
 	} catch (e) {
 		logger.log(e);
 	}
+}
+
+async function hasWorkerPool() {
+	logger.debug(`GET: ${env.PREFECT_POOL} from prefect`)
+	const resp = await fetch(
+		`${env.PREFECT_API_URL}/work_pools/${env.PREFECT_POOL}`,
+		{
+			method: "GET",
+			headers: {
+				"Content-Type": "application/json"
+			}
+		}
+	)
+	if(resp.status < 200 || resp.status > 202) {
+		logger.info(`${env.PREFECT_POOL} pool is not found`)
+		return false
+	}
+	return true
 }
