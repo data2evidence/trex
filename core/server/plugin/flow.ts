@@ -42,7 +42,9 @@ export async function addFlowPlugin(value) {
 							image_pull_policy: f.image_pull_policy,
 							volumes: env.PREFECT_DOCKER_VOLUMES,
 							networks: [env.PREFECT_DOCKER_NETWORK]
-						}};
+						},
+						tags: f.tags,
+					};
 					if(f.parameter_openapi_schema) body["parameter_openapi_schema"] = f.parameter_openapi_schema
 					const res2 = await fetch(`${env.PREFECT_API_URL}/deployments/`, {
 					method: "POST",
