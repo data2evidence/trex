@@ -634,7 +634,7 @@ globalThis.bootstrapSBEdge = (opts, ctx) => {
 		}
 
 		const apisToBeOverridden = {
-			...DENIED_DENO_FS_API_LIST,
+			//...DENIED_DENO_FS_API_LIST,
 
 			'cwd': true,
 
