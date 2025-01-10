@@ -26,6 +26,8 @@ use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
 use tls_listener::TlsListener;
+use tls_listener::rustls::TlsAcceptor;
+use tls_listener::rustls::rustls::ServerConfig;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tokio::pin;
@@ -33,8 +35,6 @@ use tokio::sync::mpsc::{Sender, UnboundedSender};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::{sleep, timeout};
 use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use tokio_rustls::rustls::ServerConfig;
-use tokio_rustls::TlsAcceptor;
 use tokio_util::sync::CancellationToken;
 use url::Url;
 

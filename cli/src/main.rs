@@ -7,6 +7,8 @@ mod logger;
 use anyhow::{anyhow, bail, Error};
 use base::commands::start_server;
 
+use trex::{start_sql_server, AuthType};
+
 use base::server::{ServerFlags, Tls, WorkerEntrypoints};
 use base::utils::path::find_up;
 use base::utils::units::percentage_value;
@@ -90,6 +92,31 @@ fn main() -> Result<ExitCode, anyhow::Error> {
                 } else {
                     None
                 };
+
+                let sql = sub_matches.get_one::<u16>("sql").cloned();
+                let sql_scram = sub_matches.get_one::<bool>("sql-scram").cloned().unwrap();
+                let sql_password = sub_matches.get_one::<String>("sql-password").cloned().unwrap();
+
+                if sql.is_some() {
+                    if sql_scram {
+                        let Some((key_slice, cert_slice)) = sub_matches
+                            .get_one::<PathBuf>("key")
+                            .and_then(|it| std::fs::read(it).ok())
+                            .zip(
+                                sub_matches
+                                    .get_one::<PathBuf>("cert")
+                                    .and_then(|it| std::fs::read(it).ok()),
+                            )
+                        else {
+                            bail!("unable to load the key file or cert file");
+                        };
+                        tokio::spawn(async move { start_sql_server(sql.unwrap(), AuthType::Scram {password: sql_password, key_slice: key_slice, cert_slice: cert_slice}).await });
+
+                    } else {
+                        tokio::spawn(async move { start_sql_server(sql.unwrap(), AuthType::Default{password: sql_password}).await });
+                    }
+                }
+                
 
                 let main_service_path = sub_matches
                     .get_one::<String>("main-service")

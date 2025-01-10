@@ -3,14 +3,16 @@ name = "cli"
 version = "0.1.0"
 edition = "2021"
 description = "A server based on Deno runtime, capable of running JavaScript, TypeScript, and WASM services"
+default-run = "trex"
 
 [[bin]]
-name = "edge-runtime"
+name = "trex"
 path = "src/main.rs"
 
 [dependencies]
 deno_core.workspace = true
 
+trex.workspace = true
 base.workspace = true
 deno_manifest.workspace = true
 graph.workspace = true

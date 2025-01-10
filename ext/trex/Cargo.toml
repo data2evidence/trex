@@ -1,0 +1,27 @@
+[package]
+name = "trex"
+version = "0.1.0"
+authors = [""]
+edition = "2021"
+license = "Apache-2.0"
+
+[lib]
+path = "main.rs"
+
+[[bin]]
+name = "trexdb"
+path = "main.rs"
+
+[dependencies]
+deno_core.workspace = true
+duckdb = { version = "1.1.1", default-features = false, features = ["bundled"] }
+pgwire = { version = "0.28.0", default-features = false, features = ["server-api", "_bundled", "_duckdb"] }
+pg_replicate = { git = "https://github.com/supabase/pg_replicate.git", features = ["duckdb"] }
+chrono = {version = "0.4.34" }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+futures.workspace = true
+tokio-postgres = { git = "https://github.com/imor/rust-postgres", default-features = false, rev = "20265ef38e32a06f76b6f9b678e2077fc2211f6b" }
+thiserror = "1.0"

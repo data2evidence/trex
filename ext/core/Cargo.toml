@@ -31,6 +31,7 @@ base_mem_check.workspace = true
 deno_manifest.workspace = true
 
 sb_node.workspace = true
+trex.workspace = true
 
 libc.workspace = true
 anyhow.workspace = true
@@ -61,7 +62,7 @@ tracing.workspace = true
 
 data-url = "=0.3.0"
 cache_control = "=0.2.0"
-chrono = { version = "=0.4.22", default-features = false, features = ["clock"] }
+chrono = { version = "0.4.22", default-features = false, features = ["clock"] }
 twox-hash = "=1.6.3"
 encoding_rs = "=0.8.33"
 memmem = "0.1"

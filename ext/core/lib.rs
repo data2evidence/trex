@@ -14,9 +14,10 @@ use futures::task::AtomicWaker;
 use futures::FutureExt;
 use log::error;
 use serde::Serialize;
-use std::process::Command;
 use tokio::sync::oneshot;
 use tracing::{debug, debug_span};
+
+use trex::{install_plugin, add_replication};
 
 mod npm;
 mod upgrade;
@@ -327,19 +328,12 @@ fn op_runtime_memory_usage(scope: &mut v8::HandleScope) -> MemoryUsage {
 
 #[op2(fast)]
 fn op_install_plugin(#[string] name: String, #[string] dir: String) {
-    Command::new("npx")
-        .args([
-            "bun",
-            "install",
-            "-f",
-            "--silent",
-            "--no-cache",
-            "--no-save",
-            &name,
-        ])
-        .current_dir(dir)
-        .status()
-        .expect("failed to execute process");
+    install_plugin(name, dir);
+}
+
+#[op2(fast)]
+fn op_add_replication(#[string] publication: String, #[string] slot_name: String, #[string] duckdb_file: String, #[string] db_host: String, #[smi] db_port: i32, #[string] db_name: String, #[string] db_username: String, #[string] db_password: String) {
+    add_replication(publication, slot_name, duckdb_file, db_host, db_port.try_into().unwrap(), db_name, db_username, db_password);
 }
 
 #[op2]
@@ -443,6 +437,7 @@ deno_core::extension!(
         op_set_exit_code,
         op_runtime_metrics,
         op_install_plugin,
+        op_add_replication,
         op_schedule_mem_check,
         op_runtime_memory_usage,
         op_set_raw,
