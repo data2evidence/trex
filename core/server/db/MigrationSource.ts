@@ -13,7 +13,7 @@ export class MigrationSource {
     }
   
     getMigrationName(migration) {
-      return migration.slice(0,-2)+"js";
+      return migration;
     }
   
     getMigration(migration)  {
