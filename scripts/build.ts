@@ -25,6 +25,7 @@ async function build(fn) {
             console.log(_args)
             console.log(new TextDecoder().decode(stdout));
             console.error(new TextDecoder().decode(stderr));
+            Deno.exit(-1);
         }
         
         
