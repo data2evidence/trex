@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: "18.x"
           registry-url: "https://npm.pkg.github.com"
-          scope: "@alp-os"
+          scope: "@data2evidence"
       - name: Publish
         run: |
           if [[ $GIT_CI_BRANCH_NAME == 'npmci' || $GIT_CI_BRANCH_NAME == 'develop' ]]; then 
