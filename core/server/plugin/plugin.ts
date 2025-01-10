@@ -22,7 +22,7 @@ export class Plugins {
 
 	private async initDB() {
 		let res = await this.pgclient.connect();
-		res = await this.pgclient.query("CREATE TABLE IF NOT EXISTS trex.plugins (name VARCHAR(256) PRIMARY KEY, url VARCHAR(1024), version VARCHAR(256), payload JSONB)");
+		//res = await this.pgclient.query("CREATE TABLE IF NOT EXISTS trex.plugins (name VARCHAR(256) PRIMARY KEY, url VARCHAR(1024), version VARCHAR(256), payload JSONB)");
 	}
 
 	private pgclient;
