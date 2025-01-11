@@ -51,6 +51,23 @@ jobs:
           echo GIT_BRANCH_NAME="${GIT_BRANCH_NAME}" >> $GITHUB_OUTPUT
           echo ACR_IMAGE_PUSH="${ACR_IMAGE_PUSH}" >> $GITHUB_OUTPUT
 
+      - name: 'Login to GitHub Container Registry'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{github.actor}}
+          password: ${{secrets.GITHUB_TOKEN}}
+          
+      - name: Build and Push
+        id: build-push2
+        uses: docker/build-push-action@v6
+        with:
+          push: ${{ steps.setup.outputs.ACR_IMAGE_PUSH }}
+          platforms: "linux/amd64"
+          tags: ghcr.io/data2evidence/${{ matrix.AZ_REGISTRY_REPOSITORY }}:develop
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          
       - name: Login to ACR
         uses: docker/login-action@v3
         with:
