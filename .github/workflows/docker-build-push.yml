@@ -85,6 +85,15 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
 
+      
+      - name: delete-untagged-images
+        uses: actions/delete-package-versions@v5
+        with: 
+          package-name: 'd2e-trex-base'
+          package-type: 'container'
+          min-versions-to-keep: 1
+          delete-only-pre-release-versions: "false"
+
       - name: Output Summary 
         run: | 
           echo "### Output summary 🚀" >> $GITHUB_STEP_SUMMARY
