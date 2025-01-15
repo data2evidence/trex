@@ -1,19 +1,27 @@
 name: Docker Build and Push to Azure CR
 
 on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Enter tag for Image
+        required: true
+        type: string
   push:
     branches:
       - develop
   pull_request:
     types: [opened, ready_for_review, reopened, synchronize]
-    
+
+env:
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
 
 jobs:
   build-push-image:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include: 
+        include:
           - AZ_REGISTRY_REPOSITORY: d2e-trex-base
             context: .
             dockerfile: ./Dockerfile.trex
@@ -34,71 +42,83 @@ jobs:
           large-packages: false
           docker-images: true
           swap-storage: true
-          
+
       - name: Check out repository code
         uses: actions/checkout@v4
 
       - name: Setting up variables
         id: setup
         run: |
-          DOCKER_IMG_TAG_NAME=$(echo $(git rev-parse --short HEAD))
-          GIT_BRANCH_NAME=$(echo ${{ github.ref }} )
           ACR_IMAGE_PUSH=false
-          if [[ ${{ github.event_name }} == "push" ]]; then 
+          if [[ ${{ github.event_name }} == "push" || ${{ github.event_name }} == "workflow_dispatch" ]]; then 
             ACR_IMAGE_PUSH=true
           fi
-          echo DOCKER_IMG_TAG_NAME=$DOCKER_IMG_TAG_NAME >> $GITHUB_OUTPUT 
-          echo GIT_BRANCH_NAME="${GIT_BRANCH_NAME}" >> $GITHUB_OUTPUT
+
+          if [[ ${{ contains('release/', github.ref_name) }} = true ]]; then
+            RELEASE_BRANCH_NAME=$(echo $GIT_CI_BRANCH_NAME | awk -F"release/|-*" '{print $2}')
+            echo GIT_BRANCH_NAME=$RELEASE_BRANCH_NAME >> $GITHUB_OUTPUT
+          else
+            echo GIT_BRANCH_NAME=$BRANCH_NAME >> $GITHUB_OUTPUT
+          fi
+
+          if [[ ${{ github.event_name }} == "workflow_dispatch" ]]; then
+            DOCKER_IMG_TAG_NAME=${{ github.event.inputs.tag }}
+          elif [[ ${{ github.event_name }} == "push" ]]; then
+            DOCKER_IMG_TAG_NAME=${{ github.ref_name }}
+          else
+            DOCKER_IMG_TAG_NAME=$(echo $(git rev-parse --short HEAD))
+          fi
+
+          echo DOCKER_IMG_TAG_NAME=$DOCKER_IMG_TAG_NAME >> $GITHUB_OUTPUT
           echo ACR_IMAGE_PUSH="${ACR_IMAGE_PUSH}" >> $GITHUB_OUTPUT
 
-      - name: 'Login to GitHub Container Registry'
+      - name: "Login to GitHub Container Registry"
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{github.actor}}
           password: ${{secrets.GITHUB_TOKEN}}
-          
+
       - name: Build and Push
         id: build-push2
         uses: docker/build-push-action@v6
         with:
           push: ${{ steps.setup.outputs.ACR_IMAGE_PUSH }}
           platforms: "linux/amd64"
-          tags: ghcr.io/data2evidence/${{ matrix.AZ_REGISTRY_REPOSITORY }}:develop
+          tags: ghcr.io/data2evidence/${{ matrix.AZ_REGISTRY_REPOSITORY }}:${{ steps.setup.outputs.DOCKER_IMG_TAG_NAME }}
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
-          
+
       - name: Login to ACR
         uses: docker/login-action@v3
         with:
           registry: ${{ vars.AZ_REGISTRY_NAME }}.azurecr.io
           username: ${{ vars.AZ_REGISTRY_USERNAME }}
           password: ${{ secrets.AZ_REGISTRY_PASSWORD }}
-        
+
       - name: Build and Push
         id: build-push
         uses: docker/build-push-action@v6
         with:
           push: ${{ steps.setup.outputs.ACR_IMAGE_PUSH }}
           platforms: "linux/amd64"
-          tags: ${{ vars.AZ_REGISTRY_NAME }}.azurecr.io/${{ matrix.AZ_REGISTRY_REPOSITORY }}:develop
+          tags: ${{ vars.AZ_REGISTRY_NAME }}.azurecr.io/${{ matrix.AZ_REGISTRY_REPOSITORY }}:${{ steps.setup.outputs.DOCKER_IMG_TAG_NAME }}
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
 
-      
       - name: delete-untagged-images
         uses: actions/delete-package-versions@v5
-        with: 
-          package-name: 'd2e-trex-base'
-          package-type: 'container'
+        with:
+          package-name: "d2e-trex-base"
+          package-type: "container"
           min-versions-to-keep: 1
           delete-only-pre-release-versions: "false"
 
-      - name: Output Summary 
-        run: | 
+      - name: Output Summary
+        run: |
           echo "### Output summary 🚀" >> $GITHUB_STEP_SUMMARY
           echo "Job Status: ${{ job.status }} " >> $GITHUB_STEP_SUMMARY
-          echo "GIT_BRANCH_NAME: ${{ steps.setup.outputs.GIT_BRANCH_NAME }} " >> $GITHUB_STEP_SUMMARY
+          echo "GIT_BRANCH_NAME: ${{ env.GIT_BRANCH_NAME }} " >> $GITHUB_STEP_SUMMARY
           echo "GIT_COMMIT_ARG: ${{ github.sha }} " >> $GITHUB_STEP_SUMMARY
           echo "AZ_REGISTRY_REPOSITORY: ${{ matrix.AZ_REGISTRY_REPOSITORY }} " >> $GITHUB_STEP_SUMMARY
           echo "ACR_IMAGE_PUSH: ${{ steps.setup.outputs.ACR_IMAGE_PUSH }} " >> $GITHUB_STEP_SUMMARY
