@@ -54,13 +54,6 @@ jobs:
             ACR_IMAGE_PUSH=true
           fi
 
-          if [[ ${{ contains('release/', github.ref_name) }} = true ]]; then
-            RELEASE_BRANCH_NAME=$(echo $GIT_CI_BRANCH_NAME | awk -F"release/|-*" '{print $2}')
-            echo GIT_BRANCH_NAME=$RELEASE_BRANCH_NAME >> $GITHUB_OUTPUT
-          else
-            echo GIT_BRANCH_NAME=$BRANCH_NAME >> $GITHUB_OUTPUT
-          fi
-
           if [[ ${{ github.event_name }} == "workflow_dispatch" ]]; then
             DOCKER_IMG_TAG_NAME=${{ github.event.inputs.tag }}
           elif [[ ${{ github.event_name }} == "push" ]]; then
@@ -69,6 +62,7 @@ jobs:
             DOCKER_IMG_TAG_NAME=$(echo $(git rev-parse --short HEAD))
           fi
 
+          echo GIT_BRANCH_NAME=$BRANCH_NAME >> $GITHUB_OUTPUT
           echo DOCKER_IMG_TAG_NAME=$DOCKER_IMG_TAG_NAME >> $GITHUB_OUTPUT
           echo ACR_IMAGE_PUSH="${ACR_IMAGE_PUSH}" >> $GITHUB_OUTPUT
 
