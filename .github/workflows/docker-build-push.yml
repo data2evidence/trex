@@ -13,9 +13,6 @@ on:
   pull_request:
     types: [opened, ready_for_review, reopened, synchronize]
 
-env:
-  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
-
 jobs:
   build-push-image:
     runs-on: ubuntu-latest
@@ -101,6 +98,8 @@ jobs:
           file: ${{ matrix.dockerfile }}
 
       - name: delete-untagged-images
+        if: env.GIT_BRANCH_NAME == 'develop'
+        continue-on-error: true
         uses: actions/delete-package-versions@v5
         with:
           package-name: "d2e-trex-base"
