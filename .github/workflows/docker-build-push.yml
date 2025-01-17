@@ -3,6 +3,17 @@ name: Docker Build and Push to Azure CR
 on:
   workflow_dispatch:
     inputs:
+      GIT_REPO_FULL_NAME:
+        description: Select RepoName
+        required: false
+        type: choice
+        options:
+          - data2evidence/trex
+      GIT_BRANCH_NAME:
+        default: main
+        description: Enter BranchName / ReleaseTagName
+        required: true
+        type: string
       tag:
         description: Enter tag for Image
         required: true
@@ -12,6 +23,10 @@ on:
       - develop
   pull_request:
     types: [opened, ready_for_review, reopened, synchronize]
+
+env:
+  GIT_BRANCH_NAME: ${{ github.event.inputs.GIT_BRANCH_NAME || github.head_ref || github.ref_name }} # workflow_dispatch || pull_request || push
+  GIT_REPO_FULL_NAME: ${{ github.event.inputs.GIT_REPO_FULL_NAME || github.event.pull_request.head.repo.full_name || github.event.repository.full_name }} # workflow_dispatch || pull_request || push
 
 jobs:
   build-push-image:
@@ -42,6 +57,9 @@ jobs:
 
       - name: Check out repository code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.GIT_BRANCH_NAME }}
+          repository: ${{ env.GIT_REPO_FULL_NAME }}
 
       - name: Setting up variables
         id: setup
@@ -59,7 +77,7 @@ jobs:
             DOCKER_IMG_TAG_NAME=$(echo $(git rev-parse --short HEAD))
           fi
 
-          echo GIT_BRANCH_NAME=$BRANCH_NAME >> $GITHUB_OUTPUT
+          echo GIT_BRANCH_NAME=$GIT_BRANCH_NAME >> $GITHUB_OUTPUT
           echo DOCKER_IMG_TAG_NAME=$DOCKER_IMG_TAG_NAME >> $GITHUB_OUTPUT
           echo ACR_IMAGE_PUSH="${ACR_IMAGE_PUSH}" >> $GITHUB_OUTPUT
 
