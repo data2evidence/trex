@@ -1,4 +1,4 @@
-name: Docker Build and Push to Azure CR
+name: Docker Build and Push to CR
 
 on:
   workflow_dispatch:
