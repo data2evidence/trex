@@ -10,7 +10,7 @@ on:
           options:
             - data2evidence/trex
         GIT_BRANCH_NAME:
-          default: main
+          default: develop
           description: Enter BranchName / ReleaseTagName
           required: true
           type: string
@@ -66,15 +66,16 @@ jobs:
           scope: "@data2evidence"
       - name: Publish
         run: |
-          if [[ $GIT_BRANCH_NAME == 'develop' ]]; then 
+          if [[ $SHOULD_PUBLISH == true ]]; then
             npm publish
           else 
             npm publish --dry-run
           fi
         env:
+          SHOULD_PUBLISH: ${{ github.ref_name == 'develop' || github.event_name == 'workflow_dispatch' }}
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/delete-package-versions@v5
-        if: github.ref_name == 'npmci' || github.ref_name == 'develop'
+        if: github.ref_name == 'develop'
         with:
           package-name: "trex"
           package-type: "npm"

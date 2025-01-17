@@ -10,7 +10,7 @@ on:
         options:
           - data2evidence/trex
       GIT_BRANCH_NAME:
-        default: main
+        default: develop
         description: Enter BranchName / ReleaseTagName
         required: true
         type: string
