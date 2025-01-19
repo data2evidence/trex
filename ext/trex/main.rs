@@ -51,7 +51,10 @@ impl PgWireServerHandlers for TrexDuckDBFactory {
 
 pub fn add_replication(publication: String, slot_name: String, duckdb_file: String, db_host: String, db_port: u16, db_name: String, db_username: String, db_password: String) {
     println!("TREX START REPLICATION: {duckdb_file}");
-    let command: ReplicateCommand = ReplicateCommand::Cdc { publication, slot_name };
+    let command: ReplicateCommand = ReplicateCommand::Cdc {
+        publication,
+        slot_name
+    };
     tokio::spawn(async move {
         trex_replicate(
             command,
@@ -89,12 +92,9 @@ pub async fn start_sql_server(ip: &str, port: u16, auth_type: AuthType) {
         auth_type,
     });
     let _server_addr = format!("{ip}:{port}");
-    let server_addr =  _server_addr.as_str();
+    let server_addr = _server_addr.as_str();
     let listener = TcpListener::bind(server_addr).await.unwrap();
-    println!(
-        "TREX SQL Server Listening to {}",
-        server_addr
-    );
+    println!("TREX SQL Server Listening to {}", server_addr);
     loop {
         let incoming_socket = listener.accept().await.unwrap();
         let factory_ref = factory.clone();
@@ -106,6 +106,25 @@ pub async fn start_sql_server(ip: &str, port: u16, auth_type: AuthType) {
 
 #[tokio::main]
 pub async fn main() {
-    let _r = add_replication("my_publication".to_owned(),"stdout_slot".to_owned(),"test.db".to_owned(),"localhost".to_owned(),15432,"postgres".to_owned(),"postgres".to_owned(),"mypass".to_owned());
-    let _s = tokio::spawn(async move { start_sql_server("0.0.0.0", 5432, AuthType::Default { password: String::from("pencil") }).await }).await;
+    let _r = add_replication(
+        "my_publication".to_owned(),
+        "stdout_slot".to_owned(),
+        "test.db".to_owned(),
+        "localhost".to_owned(),
+        15432,
+        "postgres".to_owned(),
+        "postgres".to_owned(),
+        "mypass".to_owned()
+    );
+    let _s = tokio::spawn(async move {
+        start_sql_server(
+            "0.0.0.0",
+            5432,
+            AuthType::Default {
+                password: String::from("pencil"),
+            },
+        )
+        .await
+    })
+    .await;
 }
