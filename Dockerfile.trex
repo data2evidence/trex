@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y libssl-dev && rm -rf /var/lib/apt/lists
 RUN apt-get remove -y perl && apt-get autoremove -y
 
 WORKDIR /usr/src
-COPY --from=builder /root/edge-runtime /usr/src/trex
+COPY --from=builder /root/trex /usr/src/trex
 COPY core /usr/src/core
 COPY package.json.plugin /usr/src/plugin/package.json
 COPY bunfig.toml /usr/src/plugin/bunfig.toml
