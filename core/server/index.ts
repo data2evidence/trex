@@ -6,7 +6,15 @@ import {Plugins} from "./plugin/plugin.ts"
 import { addBaseRoutes } from "./routes/base.ts";
 import { addPluginRoutes} from "./routes/plugin.ts"
 
+logger.log('🦖 TREX DB initializing 🦖');
+
+import { InitDB } from "./db/knex.ts";
+
+await new InitDB().initalizeDataSource();
+
 logger.log('🦖 TREX initializing 🦖');
+
+
 
 const app = new Hono();
 app.use(hlogger())

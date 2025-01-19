@@ -69,7 +69,7 @@ export const env = {
     DB_CREDENTIALS__PRIVATE_KEY: _env.DB_CREDENTIALS__PRIVATE_KEY,
     GIT_COMMIT: _env.GIT_COMMIT,
     GH_TOKEN: _env.GH_TOKEN,
-    GH_ORG: 'alp-os',
+    GH_ORG: 'data2evidence',
     PLUGINS_PATH: _env.PLUGINS_PATH || "./plugin",
     PLUGINS_API_VERSION: _env.PLUGINS_API_VERSION || 'latest',
     PLUGINS_INIT: _env.PLUGINS_SEED? JSON.parse(_env.PLUGINS_SEED) : [],

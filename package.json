@@ -1,5 +1,5 @@
 {
-  "name": "@alp-os/trex",
+  "name": "@data2evidence/trex",
   "version": "1.0.0",
   "description": "",
   "main": "lib/trex.js",
