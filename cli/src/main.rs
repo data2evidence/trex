@@ -119,8 +119,8 @@ fn main() -> Result<ExitCode, anyhow::Error> {
                                 sql.unwrap(),
                                 AuthType::Scram {
                                     password: sql_password,
-                                    key_slice: key_slice,
-                                    cert_slice: cert_slice,
+                                    key_slice,
+                                    cert_slice,
                                 },
                             )
                             .await
