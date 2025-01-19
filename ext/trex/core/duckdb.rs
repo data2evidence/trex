@@ -35,7 +35,7 @@ impl SimpleQueryHandler for TrexDuckDB {
     ) -> PgWireResult<Vec<Response<'a>>>
     where
         C: ClientInfo + Unpin + Send + Sync,
-    {   
+    {
         let login_info = LoginInfo::from_client_info(_client);
         let db = login_info.database().unwrap();
 
@@ -48,7 +48,7 @@ impl SimpleQueryHandler for TrexDuckDB {
         "(select 0 as inhseqno, 0 as inhrelid, 0 as inhparent) as i join pg_catalog.pg_class as c ON")
         .replace("SELECT c.oid,c.*,t.relname as tabrelname,rt.relnamespace as refnamespace,d.description, null as consrc_copy",
         "SELECT c.oid,t.relname  as tabrelname,rt.relnamespace as refnamespace,d.description, null as consrc_copy");
-        
+
         println!("TREX_DATABASE: {:?}", db);
         println!("QUERY: {_query}");
 
@@ -59,11 +59,10 @@ impl SimpleQueryHandler for TrexDuckDB {
                 .prepare(_query)
                 .map_err(|e| PgWireError::ApiError(Box::new(e)))?;
             //let header = Arc::new(row_desc_from_stmt(&stmt, &Format::UnifiedText)?);
-
             let _rows = stmt.query(params![]);
 
-
-            _rows.map(|rows| {
+            _rows.
+                map(|rows| {
                     let header = Arc::new(row_desc_from_row(&rows, &Format::UnifiedText).unwrap());
                     let s = encode_row_data(rows, header.clone());
                     vec![Response::Query(QueryResponse::new(header, s))]
@@ -128,11 +127,15 @@ fn into_pg_type(df_type: &DataType) -> PgWireResult<Type> {
     })
 }
 
-fn set_db(conn: &MutexGuard<'_, Connection>, db: &str)  {
+fn set_db(conn: &MutexGuard<'_, Connection>, db: &str) {
     let query = format!("ATTACH IF NOT EXISTS '{db}.db'");
-    let _r = conn.execute(&query, params![]).map_err(|error| println!("ERROR: {error}"));
+    let _r = conn
+        .execute(&query, params![])
+        .map_err(|error| println!("ERROR: {error}"));
     let query2 = format!("USE {db}");
-    let _r2 = conn.execute(&query2, params![]).map_err(|error| println!("ERROR: {error}"));
+    let _r2 = conn
+        .execute(&query2, params![])
+        .map_err(|error| println!("ERROR: {error}"));
 }
 
 fn row_desc_from_row(rows: &Rows, format: &Format) -> PgWireResult<Vec<FieldInfo>> {
@@ -173,8 +176,6 @@ fn row_desc_from_stmt(stmt: &Statement, format: &Format) -> PgWireResult<Vec<Fie
         })
         .collect()
 }
-
-
 
 #[async_trait]
 impl ExtendedQueryHandler for TrexDuckDB {
@@ -256,7 +257,6 @@ impl ExtendedQueryHandler for TrexDuckDB {
     }
 }
 
-
 fn encode_row_data(
     mut rows: Rows<'_>,
     schema: Arc<Vec<FieldInfo>>,
@@ -305,18 +305,19 @@ fn encode_row_data(
                     }
                     //println!("TIME: {time} {t2}");
                     encoder
-                        .encode_field(&String::from(DateTime::from_timestamp(t2, 0)
-                        .expect("TREX: Date conversion failed")
-                        .checked_sub_signed(TimeDelta::nanoseconds(t3))
-                        .expect("TREX: Date conversion failed")
-                        .format("%Y-%m-%d")
-                        .to_string()))
-                        .unwrap();
-                    
+                        .encode_field(&String::from(
+                            DateTime::from_timestamp(t2, 0)
+                                .expect("TREX: Date conversion failed")
+                                .checked_sub_signed(TimeDelta::nanoseconds(t3))
+                                .expect("TREX: Date conversion failed")
+                                .format("%Y-%m-%d")
+                                .to_string(),
+                            ))
+                            .unwrap();
                 }
                 ValueRef::Timestamp(_unit, time) => {
                     //TODO: TREX FIX CONVERSION
-                    let mut t2 = time/1000/1000;
+                    let mut t2 = time / 1000 / 1000;
                     let mut t3 = 0;
                     if t2 < 0 {
                         t2 = 0;
@@ -324,13 +325,15 @@ fn encode_row_data(
                     }
                     //println!("TIME: {time} {t2}");
                     encoder
-                        .encode_field(&String::from(DateTime::from_timestamp(t2, 0)
-                        .expect("TREX: Date conversion failed")
-                        .checked_sub_signed(TimeDelta::nanoseconds(t3))
-                        .expect("TREX: Date conversion failed")
-                        .format("%Y-%m-%d %H:%M:%S")
-                        .to_string()))
-                        .unwrap();
+                        .encode_field(&String::from(
+                            DateTime::from_timestamp(t2, 0)
+                                .expect("TREX: Date conversion failed")
+                                .checked_sub_signed(TimeDelta::nanoseconds(t3))
+                                .expect("TREX: Date conversion failed")
+                                .format("%Y-%m-%d %H:%M:%S")
+                                .to_string(),
+                            ))
+                            .unwrap();
                 }
                 ValueRef::Blob(b) => {
                     encoder.encode_field(&b).unwrap();
@@ -389,9 +392,6 @@ fn get_params(portal: &Portal<String>) -> Vec<Box<dyn ToSql>> {
 
     results
 }
-
-
-
 
 impl TrexDuckDB {
     pub fn new() -> TrexDuckDB {

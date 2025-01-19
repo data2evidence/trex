@@ -340,7 +340,7 @@ fn op_add_replication(
     #[smi] db_port: i32,
     #[string] db_name: String,
     #[string] db_username: String,
-    #[string] db_password: String
+    #[string] db_password: String,
 ) {
     add_replication(
         publication,
@@ -349,8 +349,8 @@ fn op_add_replication(
         db_host,
         db_port.try_into().unwrap(),
         db_name,
-        db_username, 
-        db_password
+        db_username,
+        db_password,
     );
 }
 

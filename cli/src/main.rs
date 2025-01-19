@@ -131,14 +131,14 @@ fn main() -> Result<ExitCode, anyhow::Error> {
                                 myip.as_str(),
                                 sql.unwrap(),
                                 AuthType::Default {
-                                    password: sql_password
+                                    password: sql_password,
                                 },
                             )
                             .await
                         });
                     }
                 }
-                
+
                 let main_service_path = sub_matches
                     .get_one::<String>("main-service")
                     .cloned()
