@@ -1582,7 +1582,7 @@ where
             Self::Isolate(_) => None,
         }
     }
-    
+
     fn dispatch_event_with_callback<T, U, V, R>(
         &mut self,
         select_dispatch_fn: T,
