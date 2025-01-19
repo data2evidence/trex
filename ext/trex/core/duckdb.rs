@@ -71,9 +71,7 @@ impl SimpleQueryHandler for TrexDuckDB {
         } else {
             conn.execute(_query, params![])
                 .map(|affected_rows| {
-                    vec![Response::Execution(
-                        Tag::new("OK").with_rows(affected_rows),
-                    )]
+                    vec![Response::Execution(Tag::new("OK").with_rows(affected_rows))]
                 })
                 .map_err(|e| PgWireError::ApiError(Box::new(e)))
         }
@@ -252,8 +250,7 @@ impl ExtendedQueryHandler for TrexDuckDB {
         let stmt = conn
             .prepare_cached(&portal.statement.statement)
             .map_err(|e| PgWireError::ApiError(Box::new(e)))?;
-        row_desc_from_stmt(&stmt, &portal.result_column_format)
-            .map(DescribePortalResponse::new)
+        row_desc_from_stmt(&stmt, &portal.result_column_format).map(DescribePortalResponse::new)
     }
 }
 
@@ -305,12 +302,13 @@ fn encode_row_data(
                     }
                     //println!("TIME: {time} {t2}");
                     encoder
-                        .encode_field(&DateTime::from_timestamp(t2, 0)
-                            .expect("TREX: Date conversion failed")
-                            .checked_sub_signed(TimeDelta::nanoseconds(t3))
-                            .expect("TREX: Date conversion failed")
-                            .format("%Y-%m-%d")
-                            .to_string(),
+                        .encode_field(
+                            &DateTime::from_timestamp(t2, 0)
+                                .expect("TREX: Date conversion failed")
+                                .checked_sub_signed(TimeDelta::nanoseconds(t3))
+                                .expect("TREX: Date conversion failed")
+                                .format("%Y-%m-%d")
+                                .to_string(),
                         )
                         .unwrap();
                 }
@@ -324,12 +322,13 @@ fn encode_row_data(
                     }
                     //println!("TIME: {time} {t2}");
                     encoder
-                        .encode_field(&DateTime::from_timestamp(t2, 0)
-                            .expect("TREX: Date conversion failed")
-                            .checked_sub_signed(TimeDelta::nanoseconds(t3))
-                            .expect("TREX: Date conversion failed")
-                            .format("%Y-%m-%d %H:%M:%S")
-                            .to_string(),
+                        .encode_field(
+                            &DateTime::from_timestamp(t2, 0)
+                                .expect("TREX: Date conversion failed")
+                                .checked_sub_signed(TimeDelta::nanoseconds(t3))
+                                .expect("TREX: Date conversion failed")
+                                .format("%Y-%m-%d %H:%M:%S")
+                                .to_string(),
                         )
                         .unwrap();
                 }

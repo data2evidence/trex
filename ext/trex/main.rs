@@ -47,7 +47,6 @@ impl PgWireServerHandlers for TrexDuckDBFactory {
     }
 }
 
-
 pub fn add_replication(
     publication: String,
     slot_name: String,
