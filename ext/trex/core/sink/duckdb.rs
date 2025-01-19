@@ -1,9 +1,6 @@
 use std::{collections::HashSet, path::Path};
 
-use duckdb::{
-    params_from_iter,
-    Connection,
-};
+use duckdb::{params_from_iter, Connection};
 use tokio_postgres::types::{PgLsn, Type};
 
 use pg_replicate::{
