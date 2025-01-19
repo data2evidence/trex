@@ -1583,6 +1583,7 @@ where
         }
     }
 
+    #[allow(elided_named_lifetimes)]
     fn dispatch_event_with_callback<T, U, V, R>(
         &mut self,
         select_dispatch_fn: T,
