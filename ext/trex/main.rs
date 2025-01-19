@@ -70,12 +70,12 @@ pub fn install_plugin(name: String, dir: String) {
         .expect("failed to execute process");
 }
 
-pub async fn start_sql_server(port: u16, auth_type: AuthType) {
+pub async fn start_sql_server(ip: &str, port: u16, auth_type: AuthType) {
     let factory = Arc::new(TrexDuckDBFactory {
         handler: Arc::new(TrexDuckDB::new()),
         auth_type:  auth_type,
     });
-    let _server_addr = format!("127.0.0.1:{port}");
+    let _server_addr = format!("{ip}:{port}");
     let server_addr =  _server_addr.as_str();
     let listener = TcpListener::bind(server_addr).await.unwrap();
     println!(
@@ -94,5 +94,5 @@ pub async fn start_sql_server(port: u16, auth_type: AuthType) {
 #[tokio::main]
 pub async fn main() {
     let _r = add_replication("my_publication".to_owned(),"stdout_slot".to_owned(),"test.db".to_owned(),"localhost".to_owned(),15432,"postgres".to_owned(),"postgres".to_owned(),"mypass".to_owned());
-    let _s = tokio::spawn(async move { start_sql_server(5432, AuthType::Default { password: String::from("pencil") }).await }).await;
+    let _s = tokio::spawn(async move { start_sql_server("0.0.0.0", 5432, AuthType::Default { password: String::from("pencil") }).await }).await;
 }

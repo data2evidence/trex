@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use async_trait::async_trait;
 use chrono::prelude::DateTime;
 
+use chrono::TimeDelta;
 use duckdb::arrow::datatypes::DataType;
 use duckdb::Rows;
 use duckdb::{params, types::ValueRef, Connection, Statement, ToSql};
@@ -297,23 +298,38 @@ fn encode_row_data(
                 ValueRef::Date32(d) => {
                     //TODO: TREX FIX CONVERSION
                     let mut t2: i64 = i64::from(d);
+                    let mut t3 = 0;
                     if t2 < 0 {
-                        t2 = -t2;
+                        t2 = 0;
+                        t3 = t2;
                     }
                     //println!("TIME: {time} {t2}");
                     encoder
-                        .encode_field(&String::from(DateTime::from_timestamp(t2, 0).expect("TREX: Date conversion failed").format("%Y-%m-%d").to_string()))
+                        .encode_field(&String::from(DateTime::from_timestamp(t2, 0)
+                        .expect("TREX: Date conversion failed")
+                        .checked_sub_signed(TimeDelta::nanoseconds(t3))
+                        .expect("TREX: Date conversion failed")
+                        .format("%Y-%m-%d")
+                        .to_string()))
                         .unwrap();
+                    
                 }
                 ValueRef::Timestamp(_unit, time) => {
                     //TODO: TREX FIX CONVERSION
                     let mut t2 = time/1000/1000;
+                    let mut t3 = 0;
                     if t2 < 0 {
-                        t2 = -t2;
+                        t2 = 0;
+                        t3 = t2;
                     }
                     //println!("TIME: {time} {t2}");
                     encoder
-                        .encode_field(&String::from(DateTime::from_timestamp(t2, 0).expect("TREX: Date conversion failed").format("%Y-%m-%d %H:%M:%S").to_string()))
+                        .encode_field(&String::from(DateTime::from_timestamp(t2, 0)
+                        .expect("TREX: Date conversion failed")
+                        .checked_sub_signed(TimeDelta::nanoseconds(t3))
+                        .expect("TREX: Date conversion failed")
+                        .format("%Y-%m-%d %H:%M:%S")
+                        .to_string()))
                         .unwrap();
                 }
                 ValueRef::Blob(b) => {
