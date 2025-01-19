@@ -50,8 +50,21 @@ impl PgWireServerHandlers for TrexDuckDBFactory {
 
 
 pub fn add_replication(publication: String, slot_name: String, duckdb_file: String, db_host: String, db_port: u16, db_name: String, db_username: String, db_password: String) {
-    let command: ReplicateCommand = ReplicateCommand::Cdc { publication: publication, slot_name: slot_name};
-    tokio::spawn(async move { trex_replicate(command,duckdb_file.as_str(),db_host.as_str(), db_port, db_name.as_str(), db_username.as_str(), Some(db_password)).await.map_err(|error| println!("ERROR: {error}")) });
+    println!("TREX START REPLICATION: {duckdb_file}");
+    let command: ReplicateCommand = ReplicateCommand::Cdc { publication, slot_name };
+    tokio::spawn(async move {
+        trex_replicate(
+            command,
+            duckdb_file.as_str(),
+            db_host.as_str(),
+            db_port,
+            db_name.as_str(),
+            db_username.as_str(),
+            Some(db_password))
+                .await
+                .map_err(|error| println!("ERROR: {error}")) 
+            }
+        );
 }
 
 pub fn install_plugin(name: String, dir: String) {
@@ -73,7 +86,7 @@ pub fn install_plugin(name: String, dir: String) {
 pub async fn start_sql_server(ip: &str, port: u16, auth_type: AuthType) {
     let factory = Arc::new(TrexDuckDBFactory {
         handler: Arc::new(TrexDuckDB::new()),
-        auth_type:  auth_type,
+        auth_type,
     });
     let _server_addr = format!("{ip}:{port}");
     let server_addr =  _server_addr.as_str();

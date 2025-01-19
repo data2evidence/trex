@@ -8,13 +8,13 @@ use pg_replicate::{
         sources::postgres::{PostgresSource, TableNamesFrom},
         PipelineAction,
     },
-    table::TableName,
+//    table::TableName,
 };
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+//use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 
 pub enum ReplicateCommand {
-    CopyTable { schema: String, name: String },
+    // CopyTable { schema: String, name: String },
 
     Cdc {
         publication: String,
@@ -22,6 +22,7 @@ pub enum ReplicateCommand {
     },
 }
 
+/*
 fn init_tracing() {
     tracing_subscriber::registry()
         .with(
@@ -37,13 +38,14 @@ fn set_log_level() {
         std::env::set_var("RUST_LOG", "info");
     }
 }
+*/
 
 pub async fn trex_replicate(command: ReplicateCommand, duckdb_file: &str, db_host: &str, db_port: u16, db_name: &str, db_username: &str, db_password: Option<String>) -> Result<(), Box<dyn Error>> {
-    set_log_level();
-    init_tracing();
+    //set_log_level();
+    //init_tracing();
 
     let (postgres_source, action) = match command {
-        ReplicateCommand::CopyTable { schema, name } => {
+        /* ReplicateCommand::CopyTable { schema, name } => {
             let table_names = vec![TableName { schema, name }];
 
             let postgres_source = PostgresSource::new(
@@ -57,7 +59,7 @@ pub async fn trex_replicate(command: ReplicateCommand, duckdb_file: &str, db_hos
             )
             .await?;
             (postgres_source, PipelineAction::TableCopiesOnly)
-        }
+        } */
         ReplicateCommand::Cdc {
             publication,
             slot_name,

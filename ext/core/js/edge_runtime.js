@@ -71,6 +71,7 @@ function installEdgeRuntimeNamespace(kind, terminationRequestTokenRid) {
 				raiseSegfault: () => ops.op_raise_segfault(),
 				installPlugin: (name, dir) => /* async */ ops.op_install_plugin(name, dir),
 				addReplication: (publication, slot_name, duckdb_file, db_host, db_port, db_name, db_username, db_password) => /* async */ ops.op_add_replication(publication, slot_name, duckdb_file, db_host, db_port, db_name, db_username, db_password),
+				addDB: (publication, slot_name, duckdb_file, db_host, db_port, db_name, db_username, db_password) => /* async */ ops.op_add_replication(publication, slot_name, duckdb_file, db_host, db_port, db_name, db_username, db_password),
 				...propsTrex,
 			};
 			break;

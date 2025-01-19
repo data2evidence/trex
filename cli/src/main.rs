@@ -95,7 +95,10 @@ fn main() -> Result<ExitCode, anyhow::Error> {
 
                 let sql = sub_matches.get_one::<u16>("sql").cloned();
                 let sql_scram = sub_matches.get_one::<bool>("sql-scram").cloned().unwrap();
-                let sql_password = sub_matches.get_one::<String>("sql-password").cloned().unwrap();
+                let sql_password = sub_matches
+                    .get_one::<String>("sql-password")
+                    .cloned()
+                    .unwrap();
                 let myip = ip.clone();
                 if sql.is_some() {
                     if sql_scram {
@@ -110,14 +113,32 @@ fn main() -> Result<ExitCode, anyhow::Error> {
                         else {
                             bail!("unable to load the key file or cert file");
                         };
-                        tokio::spawn(async move { start_sql_server(myip.as_str(), sql.unwrap(), AuthType::Scram {password: sql_password, key_slice: key_slice, cert_slice: cert_slice}).await });
-
+                        tokio::spawn(async move {
+                            start_sql_server(
+                                myip.as_str(),
+                                sql.unwrap(),
+                                AuthType::Scram {
+                                    password: sql_password,
+                                    key_slice: key_slice,
+                                    cert_slice: cert_slice,
+                                },
+                            )
+                            .await
+                        });
                     } else {
-                        tokio::spawn(async move { start_sql_server(myip.as_str(), sql.unwrap(), AuthType::Default{password: sql_password}).await });
+                        tokio::spawn(async move {
+                            start_sql_server(
+                                myip.as_str(),
+                                sql.unwrap(),
+                                AuthType::Default {
+                                    password: sql_password
+                                },
+                            )
+                            .await
+                        });
                     }
                 }
                 
-
                 let main_service_path = sub_matches
                     .get_one::<String>("main-service")
                     .cloned()

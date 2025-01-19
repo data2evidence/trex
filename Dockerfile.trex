@@ -12,13 +12,13 @@ WORKDIR /usr/src/
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=${TARGETPLATFORM} \
     cargo install cargo-strip
 
-COPY . /usr/src/edge-runtime
-WORKDIR /usr/src/edge-runtime
+COPY . /usr/src/trex
+WORKDIR /usr/src/trex
 
-RUN --mount=type=cache,target=/usr/local/cargo/registry,id=${TARGETPLATFORM} --mount=type=cache,target=/usr/src/edge-runtime/target,id=${TARGETPLATFORM} \
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=${TARGETPLATFORM} --mount=type=cache,target=/usr/src/trex/target,id=${TARGETPLATFORM} \
     GIT_V_TAG=${GIT_V_VERSION} cargo build --profile ${PROFILE} --features "${FEATURES}" && \
     cargo strip && \
-    mv /usr/src/edge-runtime/target/${PROFILE}/trex /root
+    mv /usr/src/trex/target/${PROFILE}/trex /root
 
 FROM node:18.20.4-bookworm-slim AS development
 RUN apt-get update && apt-get install -y libssl-dev && rm -rf /var/lib/apt/lists/*

@@ -19,6 +19,7 @@ pub struct DuckDbClient {
 
 //TODO: fix all sql injections
 impl DuckDbClient {
+    /*
     pub fn open_in_memory() -> Result<DuckDbClient, duckdb::Error> {
         let conn = Connection::open_in_memory()?;
         let current_database = Self::current_database(&conn)?;
@@ -27,6 +28,7 @@ impl DuckDbClient {
             current_database,
         })
     }
+    */
 
     pub fn open_file<P: AsRef<Path>>(file_name: P) -> Result<DuckDbClient, duckdb::Error> {
         let conn = Connection::open(file_name)?;
@@ -37,6 +39,7 @@ impl DuckDbClient {
         })
     }
 
+    /*
     pub fn open_mother_duck(
         access_token: &str,
         db_name: &str,
@@ -52,6 +55,7 @@ impl DuckDbClient {
             current_database,
         })
     }
+    */
 
     fn current_database(conn: &Connection) -> Result<String, duckdb::Error> {
         let mut stmt = conn.prepare("select current_database()")?;

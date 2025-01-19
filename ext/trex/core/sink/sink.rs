@@ -44,6 +44,7 @@ impl DuckDbSink {
         })
     }
 
+    /*
     pub async fn mother_duck(
         access_token: &str,
         db_name: &str,
@@ -84,6 +85,7 @@ impl DuckDbSink {
             res_receiver,
         })
     }
+    */
 
     pub async fn execute(
         &mut self,
