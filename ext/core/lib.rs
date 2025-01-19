@@ -331,6 +331,7 @@ fn op_install_plugin(#[string] name: String, #[string] dir: String) {
     install_plugin(name, dir);
 }
 
+#[allow(clippy::too_many_arguments)]
 #[op2(fast)]
 fn op_add_replication(
     #[string] publication: String,
