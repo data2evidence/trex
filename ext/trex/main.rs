@@ -47,6 +47,7 @@ impl PgWireServerHandlers for TrexDuckDBFactory {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn add_replication(
     publication: String,
     slot_name: String,

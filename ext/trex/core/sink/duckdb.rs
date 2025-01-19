@@ -2,13 +2,12 @@ use std::{collections::HashSet, path::Path};
 
 use duckdb::{
     params_from_iter,
-    types::{ToSqlOutput, Value},
     Connection,
 };
 use tokio_postgres::types::{PgLsn, Type};
 
 use pg_replicate::{
-    conversions::{table_row::TableRow, ArrayCell, Cell},
+    conversions::table_row::TableRow,
     table::{ColumnSchema, TableId, TableName, TableSchema},
 };
 

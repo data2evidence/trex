@@ -215,7 +215,7 @@ impl ExtendedQueryHandler for TrexDuckDB {
         } else {
             stmt.execute::<&[&dyn duckdb::ToSql]>(params_ref.as_ref())
                 .map(|affected_rows| {
-                    Response::Execution(Tag::new("OK").with_rows(affected_rows).into())
+                    Response::Execution(Tag::new("OK").with_rows(affected_rows))
                 })
                 .map_err(|e| PgWireError::ApiError(Box::new(e)))
         }
