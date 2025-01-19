@@ -23,12 +23,12 @@ pub struct TrexAuthSource {
 }
 
 pub fn get_startup_handler(
-    auth_type: &AuthType
-) -> Arc<Md5PasswordAuthStartupHandler<TrexAuthSource,DefaultServerParameterProvider>>  {
+    auth_type: &AuthType,
+) -> Arc<Md5PasswordAuthStartupHandler<TrexAuthSource,DefaultServerParameterProvider>> {
     match auth_type {
-        AuthType::Default { password }=> Arc::new(Md5PasswordAuthStartupHandler::new(
+        AuthType::Default { password } => Arc::new(Md5PasswordAuthStartupHandler::new(
             Arc::new(TrexAuthSource {
-                password: password.to_string()
+                password: password.to_string(),
             }),
             Arc::new(DefaultServerParameterProvider::default()),
         )),
@@ -38,7 +38,7 @@ pub fn get_startup_handler(
             cert_slice,
         } => Arc::new(Md5PasswordAuthStartupHandler::new(
             Arc::new(TrexAuthSource {
-                password: password.to_string()
+                password: password.to_string(),
             }),
             Arc::new(DefaultServerParameterProvider::default()),
         )),

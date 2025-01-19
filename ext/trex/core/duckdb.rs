@@ -61,8 +61,8 @@ impl SimpleQueryHandler for TrexDuckDB {
             //let header = Arc::new(row_desc_from_stmt(&stmt, &Format::UnifiedText)?);
             let _rows = stmt.query(params![]);
 
-            _rows.
-                map(|rows| {
+            _rows
+                .map(|rows| {
                     let header = Arc::new(row_desc_from_row(&rows, &Format::UnifiedText).unwrap());
                     let s = encode_row_data(rows, header.clone());
                     vec![Response::Query(QueryResponse::new(header, s))]
@@ -312,8 +312,8 @@ fn encode_row_data(
                                 .expect("TREX: Date conversion failed")
                                 .format("%Y-%m-%d")
                                 .to_string(),
-                            ))
-                            .unwrap();
+                        ))
+                        .unwrap();
                 }
                 ValueRef::Timestamp(_unit, time) => {
                     //TODO: TREX FIX CONVERSION
@@ -332,8 +332,8 @@ fn encode_row_data(
                                 .expect("TREX: Date conversion failed")
                                 .format("%Y-%m-%d %H:%M:%S")
                                 .to_string(),
-                            ))
-                            .unwrap();
+                        ))
+                        .unwrap();
                 }
                 ValueRef::Blob(b) => {
                     encoder.encode_field(&b).unwrap();

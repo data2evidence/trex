@@ -19,7 +19,7 @@ pub struct TrexDuckDBFactory {
 }
 
 impl PgWireServerHandlers for TrexDuckDBFactory {
-    type StartupHandler = 
+    type StartupHandler =
         Md5PasswordAuthStartupHandler<TrexAuthSource, DefaultServerParameterProvider>;
     type SimpleQueryHandler = TrexDuckDB;
     type ExtendedQueryHandler = TrexDuckDB;
@@ -54,7 +54,7 @@ pub fn add_replication(publication: String,
     db_host: String,
     db_port: u16,
     db_name: String,
-    db_username: String, 
+    db_username: String,
     db_password: String,
 ) {
     println!("TREX START REPLICATION: {duckdb_file}");
@@ -70,7 +70,7 @@ pub fn add_replication(publication: String,
             db_port,
             db_name.as_str(),
             db_username.as_str(),
-            Some(db_password)
+            Some(db_password),
         )
         .await
         .map_err(|error| println!("ERROR: {error}"))

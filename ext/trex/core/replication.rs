@@ -12,7 +12,6 @@ use pg_replicate::{
 };
 //use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-
 pub enum ReplicateCommand {
     // CopyTable { schema: String, name: String },
     Cdc {
@@ -46,7 +45,7 @@ pub async fn trex_replicate(
     db_port: u16,
     db_name: &str,
     db_username: &str,
-    db_password: Option<String>
+    db_password: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
     //set_log_level();
     //init_tracing();
