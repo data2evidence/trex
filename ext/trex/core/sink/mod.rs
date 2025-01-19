@@ -1,5 +1,5 @@
 pub use executor::DuckDbRequest;
-pub use sink::DuckDbSink;
+pub use sinkx::DuckDbSink;
 mod duckdb;
 mod executor;
-mod sink;
+mod sinkx;

@@ -3,7 +3,7 @@ use std::{collections::HashSet, path::Path};
 use duckdb::{
     params_from_iter,
     types::{ToSqlOutput, Value},
-    Config, Connection,
+    Connection,
 };
 use tokio_postgres::types::{PgLsn, Type};
 
@@ -383,10 +383,10 @@ impl DuckDbClient {
     }
 }
 
-trait From<Cell> {
-    fn from(value: Cell) -> Self;
-}
-
+//trait From<Cell> {
+//    fn from(value: Cell) -> Self;
+//}
+/*
 impl From<Cell> for Value {
     fn from(value: Cell) -> Self {
         match value {
@@ -601,12 +601,13 @@ impl From<ArrayCell> for Value {
     }
 }
 
-trait ToSql {
-    fn to_sql(&self) -> duckdb::Result<ToSqlOutput<'_>>;
-}
+//trait ToSql {
+//    fn to_sql(&self) -> duckdb::Result<ToSqlOutput<'_>>;
+//}
 impl ToSql for Cell {
     fn to_sql(&self) -> duckdb::Result<ToSqlOutput<'_>> {
         let value: Value = self.clone().into();
         Ok(ToSqlOutput::Owned(value))
     }
 }
+*/

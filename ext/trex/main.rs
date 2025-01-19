@@ -112,7 +112,7 @@ pub async fn start_sql_server(ip: &str, port: u16, auth_type: AuthType) {
 
 #[tokio::main]
 pub async fn main() {
-    let _r = add_replication(
+    add_replication(
         "my_publication".to_owned(),
         "stdout_slot".to_owned(),
         "test.db".to_owned(),

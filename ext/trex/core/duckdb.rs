@@ -72,7 +72,7 @@ impl SimpleQueryHandler for TrexDuckDB {
             conn.execute(_query, params![])
                 .map(|affected_rows| {
                     vec![Response::Execution(
-                        Tag::new("OK").with_rows(affected_rows).into(),
+                        Tag::new("OK").with_rows(affected_rows),
                     )]
                 })
                 .map_err(|e| PgWireError::ApiError(Box::new(e)))
@@ -253,7 +253,7 @@ impl ExtendedQueryHandler for TrexDuckDB {
             .prepare_cached(&portal.statement.statement)
             .map_err(|e| PgWireError::ApiError(Box::new(e)))?;
         row_desc_from_stmt(&stmt, &portal.result_column_format)
-            .map(|fields| DescribePortalResponse::new(fields))
+            .map(DescribePortalResponse::new)
     }
 }
 
@@ -305,14 +305,13 @@ fn encode_row_data(
                     }
                     //println!("TIME: {time} {t2}");
                     encoder
-                        .encode_field(&String::from(
-                            DateTime::from_timestamp(t2, 0)
-                                .expect("TREX: Date conversion failed")
-                                .checked_sub_signed(TimeDelta::nanoseconds(t3))
-                                .expect("TREX: Date conversion failed")
-                                .format("%Y-%m-%d")
-                                .to_string(),
-                        ))
+                        .encode_field(&DateTime::from_timestamp(t2, 0)
+                            .expect("TREX: Date conversion failed")
+                            .checked_sub_signed(TimeDelta::nanoseconds(t3))
+                            .expect("TREX: Date conversion failed")
+                            .format("%Y-%m-%d")
+                            .to_string(),
+                        )
                         .unwrap();
                 }
                 ValueRef::Timestamp(_unit, time) => {
@@ -325,14 +324,13 @@ fn encode_row_data(
                     }
                     //println!("TIME: {time} {t2}");
                     encoder
-                        .encode_field(&String::from(
-                            DateTime::from_timestamp(t2, 0)
-                                .expect("TREX: Date conversion failed")
-                                .checked_sub_signed(TimeDelta::nanoseconds(t3))
-                                .expect("TREX: Date conversion failed")
-                                .format("%Y-%m-%d %H:%M:%S")
-                                .to_string(),
-                        ))
+                        .encode_field(&DateTime::from_timestamp(t2, 0)
+                            .expect("TREX: Date conversion failed")
+                            .checked_sub_signed(TimeDelta::nanoseconds(t3))
+                            .expect("TREX: Date conversion failed")
+                            .format("%Y-%m-%d %H:%M:%S")
+                            .to_string(),
+                        )
                         .unwrap();
                 }
                 ValueRef::Blob(b) => {
@@ -347,7 +345,7 @@ fn encode_row_data(
         results.push(encoder.finish());
     }
 
-    stream::iter(results.into_iter())
+    stream::iter(results)
 }
 
 fn get_params(portal: &Portal<String>) -> Vec<Box<dyn ToSql>> {
@@ -399,5 +397,11 @@ impl TrexDuckDB {
             conn: Arc::new(Mutex::new(Connection::open_in_memory().unwrap())),
             query_parser: Arc::new(NoopQueryParser::new()),
         }
+    }
+}
+
+impl Default for TrexDuckDB {
+    fn default() -> Self {
+        Self::new()
     }
 }

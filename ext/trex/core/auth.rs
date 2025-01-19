@@ -34,8 +34,8 @@ pub fn get_startup_handler(
         )),
         AuthType::Scram {
             password,
-            key_slice,
-            cert_slice,
+            key_slice: _,
+            cert_slice: _,
         } => Arc::new(Md5PasswordAuthStartupHandler::new(
             Arc::new(TrexAuthSource {
                 password: password.to_string(),
