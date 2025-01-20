@@ -79,5 +79,5 @@ jobs:
           ACCESS_KEY_ID: ${{ secrets.SUPABASE_S3_ACCESS_KEY }}
           SECRET_ACCESS_KEY: ${{ secrets.SUPABASE_S3_SECRET }}
 
-      - run: cargo test --verbose
+      - run: ./scripts/test.sh --features base/tracing
 
