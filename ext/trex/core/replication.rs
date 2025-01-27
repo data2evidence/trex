@@ -1,17 +1,18 @@
-use crate::core::sink::DuckDbSink;
-
 use std::{error::Error, time::Duration};
+use std::sync::{Arc, Mutex};
+use duckdb::Connection;
 
-use pg_replicate::{
-    pipeline::{
+use crate::pipeline::{
         batching::{data_pipeline::BatchDataPipeline, BatchConfig},
+        sinks::duckdb::DuckDbSink,
         sources::postgres::{PostgresSource, TableNamesFrom},
         PipelineAction,
-    },
+    };
     //table::TableName,
-};
+
 //use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+#[derive(Clone)]
 pub enum ReplicateCommand {
     // CopyTable { schema: String, name: String },
     Cdc {
@@ -38,7 +39,7 @@ fn set_log_level() {
 }
 */
 
-pub async fn trex_replicate(
+async fn create_pipeline(duckdb: &Arc<Mutex<Connection>>,
     command: ReplicateCommand,
     duckdb_file: &str,
     db_host: &str,
@@ -46,9 +47,7 @@ pub async fn trex_replicate(
     db_name: &str,
     db_username: &str,
     db_password: Option<String>,
-) -> Result<(), Box<dyn Error>> {
-    //set_log_level();
-    //init_tracing();
+) -> Result<BatchDataPipeline<PostgresSource, DuckDbSink>, Box<dyn Error>>{
     let (postgres_source, action) = match command {
         /* ReplicateCommand::CopyTable { schema, name } => {
             let table_names = vec![TableName { schema, name }];
@@ -69,7 +68,7 @@ pub async fn trex_replicate(
             publication,
             slot_name,
         } => {
-            let postgres_source = PostgresSource::new(
+            let postgres_source: PostgresSource = PostgresSource::new(
                 db_host,
                 db_port,
                 db_name,
@@ -84,12 +83,30 @@ pub async fn trex_replicate(
         }
     };
 
-    let duckdb_sink = DuckDbSink::file(duckdb_file).await?;
+    let duckdb_sink: DuckDbSink = DuckDbSink::trexdb(duckdb, duckdb_file).await?;//DuckDbSink::file(duckdb_file).await?;//
 
-    let batch_config = BatchConfig::new(1000, Duration::from_secs(10));
-    let mut pipeline = BatchDataPipeline::new(postgres_source, duckdb_sink, action, batch_config);
+    let batch_config = BatchConfig::new(100000, Duration::from_secs(10));
+    Ok(BatchDataPipeline::new(postgres_source, duckdb_sink, action, batch_config))
+}
 
-    pipeline.start().await?;
-
+pub async fn trex_replicate(
+    duckdb: &Arc<Mutex<Connection>>,
+    command: ReplicateCommand,
+    duckdb_file: &str,
+    db_host: &str,
+    db_port: u16,
+    db_name: &str,
+    db_username: &str,
+    db_password: Option<String>,
+) -> Result<(), Box<dyn Error>> {
+    //set_log_level();
+    //init_tracing();
+    let mut retries = 0;
+    while retries < 2 {
+        let mut pipeline = create_pipeline(duckdb, command.clone(), duckdb_file, db_host, db_port, db_name, db_username, db_password.clone()).await?;
+        pipeline.start().await;
+        retries = retries + 1;
+        println!("restarting pipeline ... try {retries}");
+    }
     Ok(())
 }

@@ -4,6 +4,7 @@ import { MAIN_WORKER_API as ai } from "ext:sb_ai/js/ai.js";
 import { SUPABASE_USER_WORKERS } from "ext:sb_user_workers/user_workers.js";
 import { applySupabaseTag } from "ext:sb_core_main_js/js/http.js";
 import { waitUntil } from "ext:sb_core_main_js/js/async_hook.js";
+import { op_add_replication, op_install_plugin } from "ext:sb_trex/trex_lib.js";
 
 const ops = core.ops;
 const { ObjectDefineProperty } = primordials;
@@ -69,9 +70,9 @@ function installEdgeRuntimeNamespace(kind, terminationRequestTokenRid) {
 				applySupabaseTag: (src, dest) => applySupabaseTag(src, dest),
 				systemMemoryInfo: () => ops.op_system_memory_info(),
 				raiseSegfault: () => ops.op_raise_segfault(),
-				installPlugin: (name, dir) => /* async */ ops.op_install_plugin(name, dir),
-				addReplication: (publication, slot_name, duckdb_file, db_host, db_port, db_name, db_username, db_password) => /* async */ ops.op_add_replication(publication, slot_name, duckdb_file, db_host, db_port, db_name, db_username, db_password),
-				addDB: (publication, slot_name, duckdb_file, db_host, db_port, db_name, db_username, db_password) => /* async */ ops.op_add_replication(publication, slot_name, duckdb_file, db_host, db_port, db_name, db_username, db_password),
+				installPlugin: op_install_plugin,
+				addReplication: op_add_replication,
+				addDB: op_add_replication,
 				...propsTrex,
 			};
 			break;

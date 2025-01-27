@@ -1,13 +1,14 @@
 use std::{collections::HashMap, path::Path};
 
-use crate::core::sink::duckdb::DuckDbClient;
-
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use async_trait::async_trait;
 use tokio_postgres::types::PgLsn;
+use std::sync::{Arc, Mutex};
+use duckdb::Connection;
 
-use pg_replicate::{
+use crate::{
+    clients::duckdb::DuckDbClient,
     conversions::{cdc_event::CdcEvent, table_row::TableRow},
     pipeline::{sinks::BatchSink, PipelineResumptionState},
     table::{TableId, TableSchema},
@@ -25,7 +26,27 @@ pub struct DuckDbSink {
 const CHANNEL_SIZE: usize = 32;
 
 impl DuckDbSink {
-    pub async fn file<P: AsRef<Path>>(file_name: P) -> Result<DuckDbSink, duckdb::Error> {
+
+    pub async fn trexdb(conn: &Arc<Mutex<Connection>>, file_name: &str) -> Result<DuckDbSink, duckdb::Error> {
+        let (req_sender, req_receiver) = channel(CHANNEL_SIZE);
+        let (res_sender, res_receiver) = channel(CHANNEL_SIZE);
+        let client = DuckDbClient::trexdb(conn, file_name)?;
+        let executor = DuckDbExecutor {
+            client,
+            req_receiver,
+            res_sender,
+            table_schemas: None,
+            final_lsn: None,
+            committed_lsn: None,
+        };
+        executor.start();
+        Ok(DuckDbSink {
+            req_sender,
+            res_receiver,
+        })
+    }
+
+    /*pub async fn file<P: AsRef<Path>>(file_name: P) -> Result<DuckDbSink, duckdb::Error> {
         let (req_sender, req_receiver) = channel(CHANNEL_SIZE);
         let (res_sender, res_receiver) = channel(CHANNEL_SIZE);
         let client = DuckDbClient::open_file(file_name)?;
@@ -42,10 +63,9 @@ impl DuckDbSink {
             req_sender,
             res_receiver,
         })
-    }
+    }*/
 
-    /*
-    pub async fn mother_duck(
+    /*pub async fn mother_duck(
         access_token: &str,
         db_name: &str,
     ) -> Result<DuckDbSink, duckdb::Error> {
@@ -84,8 +104,7 @@ impl DuckDbSink {
             req_sender,
             res_receiver,
         })
-    }
-    */
+    }*/
 
     pub async fn execute(
         &mut self,
@@ -136,7 +155,7 @@ impl BatchSink for DuckDbSink {
         table_id: TableId,
     ) -> Result<(), Self::Error> {
         //TODO: use batching
-        for row in rows {
+        /*for row in rows {
             let req = DuckDbRequest::InsertRow(row, table_id);
             match self.execute(req).await? {
                 DuckDbResponse::InsertRowResponse(res) => {
@@ -144,8 +163,14 @@ impl BatchSink for DuckDbSink {
                 }
                 _ => panic!("invalid response to InsertRow request"),
             }
+        }*/
+        let req = DuckDbRequest::InsertRows(rows, table_id); 
+        match self.execute(req).await? {
+            DuckDbResponse::InsertRowsResponse(res) => {
+                let _ = res?;
+            }
+            _ => panic!("invalid response to InsertRows request"),
         }
-
         Ok(())
     }
 

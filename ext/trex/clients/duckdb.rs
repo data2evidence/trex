@@ -1,21 +1,41 @@
 use std::{collections::HashSet, path::Path};
+use std::sync::{Arc, Mutex, MutexGuard};
+use deno_core::v8::Global;
 
-use duckdb::{params_from_iter, Connection};
+use duckdb::appender_params_from_iter;
+use duckdb::{
+    params,
+    params_from_iter,
+    types::{ToSqlOutput, Value},
+    Config, Connection, ToSql
+};
 use tokio_postgres::types::{PgLsn, Type};
 
-use pg_replicate::{
-    conversions::table_row::TableRow,
+use crate::{
+    conversions::{table_row::TableRow, ArrayCell, Cell},
     table::{ColumnSchema, TableId, TableName, TableSchema},
 };
 
+use tracing::{info,warn};
+
+
 pub struct DuckDbClient {
-    conn: Connection,
+    conn: Arc<Mutex<Connection>>,
     current_database: String,
 }
 
 //TODO: fix all sql injections
 impl DuckDbClient {
-    /*
+    pub fn trexdb(conn: &Arc<Mutex<Connection>>, file_name: &str) -> Result<DuckDbClient, duckdb::Error> {
+        //let conn = conn;
+        let _ = conn.lock().unwrap().execute(&format!("ATTACH IF NOT EXISTS './db/{file_name}.db' AS {file_name}"),[]);
+        let current_database = file_name.to_string();//Self::current_database(conn)?;
+        Ok(DuckDbClient {
+            conn: conn.clone(),
+            current_database,
+        })
+    }
+    /* 
     pub fn open_in_memory() -> Result<DuckDbClient, duckdb::Error> {
         let conn = Connection::open_in_memory()?;
         let current_database = Self::current_database(&conn)?;
@@ -24,7 +44,6 @@ impl DuckDbClient {
             current_database,
         })
     }
-    */
 
     pub fn open_file<P: AsRef<Path>>(file_name: P) -> Result<DuckDbClient, duckdb::Error> {
         let conn = Connection::open(file_name)?;
@@ -35,7 +54,6 @@ impl DuckDbClient {
         })
     }
 
-    /*
     pub fn open_mother_duck(
         access_token: &str,
         db_name: &str,
@@ -50,11 +68,11 @@ impl DuckDbClient {
             conn,
             current_database,
         })
-    }
-    */
+    }*/
 
-    fn current_database(conn: &Connection) -> Result<String, duckdb::Error> {
-        let mut stmt = conn.prepare("select current_database()")?;
+    fn current_database(conn: &Arc<Mutex<Connection>>) -> Result<String, duckdb::Error> {
+        let c= conn.lock().unwrap();
+        let mut stmt = c.prepare("select current_database()")?;
         let mut rows = stmt.query([])?;
 
         let row = rows
@@ -72,15 +90,17 @@ impl DuckDbClient {
     }
 
     pub fn create_schema(&self, schema_name: &str) -> Result<(), duckdb::Error> {
-        let query = format!("create schema {schema_name}");
-        self.conn.execute(&query, [])?;
+        let dbname = &self.current_database;
+        let query = format!("create schema {dbname}.{schema_name}");
+        self.conn.lock().unwrap().execute(&query, [])?;
         Ok(())
     }
 
     pub fn schema_exists(&self, schema_name: &str) -> Result<bool, duckdb::Error> {
         let query =
             "select * from information_schema.schemata where catalog_name = ? and schema_name = ?;";
-        let mut stmt = self.conn.prepare(query)?;
+        let c= self.conn.lock().unwrap();
+        let mut stmt = c.prepare(query)?;
         let exists = stmt.exists([&self.current_database, schema_name])?;
         Ok(exists)
     }
@@ -138,26 +158,43 @@ impl DuckDbClient {
     }
 
     fn duckdb_column_spec(column_schema: &ColumnSchema, s: &mut String) {
+        s.push('"');
         s.push_str(&column_schema.name);
+        s.push('"');
+
         s.push(' ');
         let typ = Self::postgres_to_duckdb_type(&column_schema.typ);
         s.push_str(typ);
-        if column_schema.primary {
-            s.push_str(" primary key");
-        };
+        //if column_schema.primary {
+        //    s.push_str(" primary key");
+        //};
     }
 
     fn create_columns_spec(column_schemas: &[ColumnSchema]) -> String {
         let mut s = String::new();
+        let mut p = String::new();
+        p.push_str("PRIMARY KEY (");
         s.push('(');
 
         for (i, column_schema) in column_schemas.iter().enumerate() {
             Self::duckdb_column_spec(column_schema, &mut s);
-            if i < column_schemas.len() - 1 {
-                s.push_str(", ");
+            //if i < column_schemas.len() - 1 {
+            s.push_str(", ");
+            //}
+            if column_schema.primary {
+                if p.chars().last().unwrap() != '(' {
+                    p.push_str(", ");
+
+                }
+                p.push('"');
+                p.push_str(&column_schema.name);
+                p.push('"');
             }
         }
-
+        p.push(')');
+        if p.len() > 14 {
+            s.push_str(p.as_str());
+        }
         s.push(')');
 
         s
@@ -170,17 +207,18 @@ impl DuckDbClient {
     ) -> Result<(), duckdb::Error> {
         let columns_spec = Self::create_columns_spec(column_schemas);
         let query = format!(
-            "create table {}.{} {}",
-            table_name.schema, table_name.name, columns_spec
+            "create table {}.{}.{} {}",
+            &self.current_database, table_name.schema, table_name.name, columns_spec
         );
-        self.conn.execute(&query, [])?;
+        self.conn.lock().unwrap().execute(&query, [])?;
         Ok(())
     }
 
     pub fn table_exists(&self, table_name: &TableName) -> Result<bool, duckdb::Error> {
         let query =
             "select * from information_schema.tables where table_catalog = ? and table_schema = ? and table_name = ?;";
-        let mut stmt = self.conn.prepare(query)?;
+        let c= self.conn.lock().unwrap();
+        let mut stmt = c.prepare(query)?;
         let exists = stmt.exists([&self.current_database, &table_name.schema, &table_name.name])?;
         Ok(exists)
     }
@@ -190,11 +228,12 @@ impl DuckDbClient {
         table_name: &TableName,
         table_row: &TableRow,
     ) -> Result<(), duckdb::Error> {
-        let table_name = format!("{}.{}", table_name.schema, table_name.name);
+        let table_name = format!("{}.{}.{}", &self.current_database, table_name.schema, table_name.name);
         let column_count = table_row.values.len();
         let query = Self::create_insert_row_query(&table_name, column_count);
-        let mut stmt = self.conn.prepare(&query)?;
-        stmt.execute(params_from_iter(table_row.values.iter()))?;
+        let c= self.conn.lock().unwrap();
+        let mut stmt = c.prepare(&query)?;
+        let _ = stmt.execute(params_from_iter(table_row.values.iter())).inspect_err(|e| warn!("TREX: Failled to insert row into {table_name}: {e}"));
 
         Ok(())
     }
@@ -211,6 +250,53 @@ impl DuckDbClient {
         s
     }
 
+    pub fn insert_rows2(
+        &self,
+        table_name: &TableName,
+        table_rows: &Vec<TableRow>,
+    ) -> Result<(), duckdb::Error> {
+        let table_name = format!("{}.{}.{}", &self.current_database, table_name.schema, table_name.name);
+        let mut query = String::new();
+        let mut values: Vec<Cell> = Vec::new();
+        
+        query.push_str("insert into ");
+        query.push_str(&table_name);
+        query.push_str(" values");
+        for table_row in table_rows {
+            let column_count = table_row.values.len();
+            if query.chars().last().unwrap() != 's' {
+                query.push(',');
+            }
+            query.push_str(" (");
+            query.push_str(&Self::repeat_vars(column_count));
+            query.push(')');
+            values.extend(table_row.values.clone());
+        }
+        let c= self.conn.lock().unwrap();
+
+        let mut stmt = c.prepare(&query)?;
+        info!("execute: insert into {table_name}");
+        let _ = stmt.execute(params_from_iter(values.iter())).inspect_err(|e| warn!("TREX: Failled to insert row: {e}"));
+
+        Ok(())
+    }
+
+
+    pub fn insert_rows(
+        &self,
+        table_name: &TableName,
+        table_rows: &Vec<TableRow>,
+    ) -> Result<(), duckdb::Error> {
+        //let table_name = format!("{}.{}", table_name.schema, table_name.name);
+        let c= self.conn.lock().unwrap();
+        let _ = c.execute(&format!("USE {};", &self.current_database), []).inspect_err(|e| warn!("TREX: Failled to insert row (appender): {e}"));
+        let mut appender = c.appender_to_db(&table_name.name, &table_name.schema)?;
+        for table_row in table_rows {
+            let _ = appender.append_row(appender_params_from_iter(table_row.values.iter())).inspect_err(|e| warn!("TREX: Failled to insert row (appender): {e}"));
+        }
+        Ok(())
+    }
+
     fn repeat_vars(count: usize) -> String {
         assert_ne!(count, 0);
         let mut s = " ?,".repeat(count);
@@ -225,9 +311,10 @@ impl DuckDbClient {
     ) -> Result<(), duckdb::Error> {
         let table_name = &table_schema.table_name;
         let column_schemas = &table_schema.column_schemas;
-        let table_name = format!("{}.{}", table_name.schema, table_name.name);
+        let table_name = format!("{}.{}.{}", &self.current_database, table_name.schema, table_name.name);
         let query = Self::create_update_row_query(&table_name, column_schemas);
-        let mut stmt = self.conn.prepare(&query)?;
+        let c= self.conn.lock().unwrap();
+        let mut stmt = c.prepare(&query)?;
         let non_identity_cells = column_schemas
             .iter()
             .zip(table_row.values.iter())
@@ -292,9 +379,10 @@ impl DuckDbClient {
     ) -> Result<(), duckdb::Error> {
         let table_name = &table_schema.table_name;
         let column_schemas = &table_schema.column_schemas;
-        let table_name = format!("{}.{}", table_name.schema, table_name.name);
+        let table_name = format!("{}.{}.{}", &self.current_database, table_name.schema, table_name.name);
         let query = Self::create_delete_row_query(&table_name, column_schemas);
-        let mut stmt = self.conn.prepare(&query)?;
+        let c= self.conn.lock().unwrap();
+        let mut stmt = c.prepare(&query)?;
         let identity_cells = column_schemas
             .iter()
             .zip(table_row.values.iter())
@@ -316,9 +404,10 @@ impl DuckDbClient {
     }
 
     pub fn get_copied_table_ids(&self) -> Result<HashSet<TableId>, duckdb::Error> {
-        let mut stmt = self
-            .conn
-            .prepare("select table_id from pg_replicate.copied_tables")?;
+        let c= self
+        .conn
+        .lock().unwrap();
+        let mut stmt = c.prepare(&format!("select table_id from {}.pg_replicate.copied_tables", &self.current_database))?;
         let mut rows = stmt.query([])?;
 
         let mut res = HashSet::new();
@@ -330,59 +419,69 @@ impl DuckDbClient {
     }
 
     pub fn get_last_lsn(&self) -> Result<PgLsn, duckdb::Error> {
-        let mut stmt = self.conn.prepare("select lsn from pg_replicate.last_lsn")?;
+        let c= self
+        .conn
+        .lock().unwrap();
+        let mut stmt = c.prepare(&format!("select lsn from {}.pg_replicate.last_lsn", &self.current_database))?;
         let lsn = stmt.query_row::<u64, _, _>([], |r| r.get(0))?;
         Ok(lsn.into())
     }
 
     pub fn set_last_lsn(&self, lsn: PgLsn) -> Result<(), duckdb::Error> {
         let lsn: u64 = lsn.into();
-        let mut stmt = self
-            .conn
-            .prepare("update pg_replicate.last_lsn set lsn = ?")?;
+        let c= self
+        .conn
+        .lock().unwrap();
+        let mut stmt = c.prepare(&format!("update {}.pg_replicate.last_lsn set lsn = ?",&self.current_database))?;
         stmt.execute([lsn])?;
         Ok(())
     }
 
     pub fn insert_last_lsn_row(&self) -> Result<(), duckdb::Error> {
         self.conn
-            .execute("insert into pg_replicate.last_lsn values (0)", [])?;
+            .lock().unwrap().execute(&format!("insert into {}.pg_replicate.last_lsn values (0)",&self.current_database), [])?;
         Ok(())
     }
 
     pub fn insert_into_copied_tables(&self, table_id: TableId) -> Result<(), duckdb::Error> {
-        let mut stmt = self
-            .conn
-            .prepare("insert into pg_replicate.copied_tables values (?)")?;
+        let c= self
+        .conn
+        .lock().unwrap();
+        let mut stmt = c.prepare(&format!("insert into {}.pg_replicate.copied_tables values (?)",&self.current_database))?;
         stmt.execute([table_id])?;
 
         Ok(())
     }
 
     pub fn truncate_table(&self, table_name: &TableName) -> Result<(), duckdb::Error> {
-        let query = format!("delete from {}.{}", table_name.schema, table_name.name);
-        let mut stmt = self.conn.prepare(&query)?;
+        let query = format!("delete from {}.{}.{}", &self.current_database, table_name.schema, table_name.name);
+        let c= self
+        .conn
+        .lock().unwrap();
+        let mut stmt = c.prepare(&query)?;
         stmt.execute([])?;
         Ok(())
     }
 
     pub fn begin_transaction(&self) -> Result<(), duckdb::Error> {
-        let mut stmt = self.conn.prepare("begin transaction")?;
+        let c= self
+        .conn
+        .lock().unwrap();
+        let mut stmt = c.prepare("begin transaction")?;
         stmt.execute([])?;
         Ok(())
     }
 
     pub fn commit_transaction(&self) -> Result<(), duckdb::Error> {
-        let mut stmt = self.conn.prepare("commit")?;
+        let c= self
+        .conn
+        .lock().unwrap();
+        let mut stmt = c.prepare("commit")?;
         stmt.execute([])?;
         Ok(())
     }
 }
 
-//trait From<Cell> {
-//    fn from(value: Cell) -> Self;
-//}
-/*
 impl From<Cell> for Value {
     fn from(value: Cell) -> Self {
         match value {
@@ -597,13 +696,9 @@ impl From<ArrayCell> for Value {
     }
 }
 
-//trait ToSql {
-//    fn to_sql(&self) -> duckdb::Result<ToSqlOutput<'_>>;
-//}
 impl ToSql for Cell {
     fn to_sql(&self) -> duckdb::Result<ToSqlOutput<'_>> {
         let value: Value = self.clone().into();
         Ok(ToSqlOutput::Owned(value))
     }
 }
-*/

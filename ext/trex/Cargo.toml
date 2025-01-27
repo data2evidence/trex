@@ -16,12 +16,43 @@ path = "main.rs"
 deno_core.workspace = true
 duckdb = { version = "1.1.1", default-features = false, features = ["bundled"] }
 pgwire = { version = "0.28.0", default-features = false, features = ["server-api", "_bundled", "_duckdb"] }
-pg_replicate = { git = "https://github.com/supabase/pg_replicate.git", features = ["duckdb"] }
-chrono = {version = "0.4.34" }
-tracing.workspace = true
+chrono = {version = "0.4.34", features = ["serde"] }
 tracing-subscriber.workspace = true
-async-trait.workspace = true
-tokio.workspace = true
-futures.workspace = true
-tokio-postgres = { git = "https://github.com/imor/rust-postgres", default-features = false, rev = "20265ef38e32a06f76b6f9b678e2077fc2211f6b" }
 thiserror = "1.0"
+async-trait = { workspace = true }
+bigdecimal = { version = "0.4.6", features = ["std"] }
+bytes = { workspace = true }
+byteorder = { version = "1.5.0", default-features = false }
+futures = { workspace = true }
+pg_escape = { version = "0.1.1", default-features = false }
+pin-project-lite = { version = "0.2", default-features = false }
+postgres-protocol = { git = "https://github.com/imor/rust-postgres", rev = "20265ef38e32a06f76b6f9b678e2077fc2211f6b" }
+postgres-replication = { git = "https://github.com/imor/rust-postgres", default-features = false, rev = "20265ef38e32a06f76b6f9b678e2077fc2211f6b" }
+prost = { version = "0.13.1", default-features = false }
+rustls = { version = "0.23.12", features = ["aws-lc-rs", "logging"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["std"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+tokio-postgres = { git = "https://github.com/imor/rust-postgres", rev = "20265ef38e32a06f76b6f9b678e2077fc2211f6b",  features = [
+    "runtime",
+    "with-chrono-0_4",
+    "with-uuid-1",
+    "with-serde_json-1",
+] }
+tracing = { workspace = true, default-features = true }
+uuid = { workspace = true, features = ["v4"] }
+
+
+[dev-dependencies]
+clap = { workspace = true, default-features = true, features = [
+    "std",
+    "derive",
+] }
+tracing-subscriber = { workspace = true, default-features = true, features = [
+    "env-filter",
+] }
+
+[features]
+unknown_types_to_bytes = []
+duckdb = []
+default = ["unknown_types_to_bytes", "duckdb"]

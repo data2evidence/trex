@@ -1,4 +1,3 @@
 pub mod auth;
-pub mod duckdb;
+pub mod sql;
 pub mod replication;
-pub mod sink;

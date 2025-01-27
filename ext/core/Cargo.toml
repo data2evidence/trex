@@ -31,7 +31,6 @@ base_mem_check.workspace = true
 deno_manifest.workspace = true
 
 sb_node.workspace = true
-trex.workspace = true
 
 libc.workspace = true
 anyhow.workspace = true

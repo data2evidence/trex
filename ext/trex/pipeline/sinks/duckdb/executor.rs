@@ -1,13 +1,12 @@
-use crate::core::sink::duckdb::DuckDbClient;
-
 use std::collections::HashMap;
 
 use thiserror::Error;
 use tokio::sync::mpsc::{error::SendError, Receiver, Sender};
 use tokio_postgres::types::{PgLsn, Type};
-use tracing::error;
+use tracing::{error, info};
 
-use pg_replicate::{
+use crate::{
+    clients::duckdb::DuckDbClient,
     conversions::{cdc_event::CdcEvent, table_row::TableRow},
     pipeline::{sinks::SinkError, PipelineResumptionState},
     table::{ColumnSchema, TableId, TableName, TableSchema},
@@ -17,6 +16,7 @@ pub enum DuckDbRequest {
     GetResumptionState,
     CreateTables(HashMap<TableId, TableSchema>),
     InsertRow(TableRow, TableId),
+    InsertRows(Vec<TableRow>, TableId),
     HandleCdcEvent(CdcEvent),
     TableCopied(TableId),
     TruncateTable(TableId),
@@ -26,6 +26,7 @@ pub enum DuckDbResponse {
     ResumptionState(Result<PipelineResumptionState, DuckDbExecutorError>),
     CreateTablesResponse(Result<(), DuckDbExecutorError>),
     InsertRowResponse(Result<(), DuckDbExecutorError>),
+    InsertRowsResponse(Result<(), DuckDbExecutorError>),
     HandleCdcEventResponse(Result<PgLsn, DuckDbExecutorError>),
     TableCopiedResponse(Result<(), DuckDbExecutorError>),
     TruncateTableResponse(Result<(), DuckDbExecutorError>),
@@ -88,6 +89,12 @@ impl DuckDbExecutor {
                     DuckDbRequest::InsertRow(row, table_id) => {
                         let result = self.insert_row(table_id, row);
                         let response = DuckDbResponse::InsertRowResponse(result);
+                        self.send_response(response).await;
+                    }
+                    DuckDbRequest::InsertRows(rows, table_id) => {
+                        let result = self.insert_rows(table_id, rows);
+                        //info!("InsertRows Result: {:?}", result);
+                        let response = DuckDbResponse::InsertRowsResponse(result);
                         self.send_response(response).await;
                     }
                     DuckDbRequest::HandleCdcEvent(event) => {
@@ -223,6 +230,17 @@ impl DuckDbExecutor {
         let table_schema = self.get_table_schema(table_id)?;
         self.client
             .insert_row(&table_schema.table_name, &table_row)?;
+        Ok(())
+    }
+
+    fn insert_rows(
+        &self,
+        table_id: TableId,
+        table_rows: Vec<TableRow>,
+    ) -> Result<(), DuckDbExecutorError> {
+        let table_schema = self.get_table_schema(table_id)?;
+        self.client
+            .insert_rows(&table_schema.table_name, &table_rows)?;
         Ok(())
     }
 

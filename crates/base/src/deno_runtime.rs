@@ -728,6 +728,7 @@ where
             sb_env_op::init_ops(),
             sb_ai::init_ops(),
             sb_os::sb_os::init_ops(),
+            trex_core::sb_trex::init_ops(),
             sb_user_workers::init_ops(),
             sb_user_event_worker::init_ops(),
             sb_events_js_interceptors::init_ops(),

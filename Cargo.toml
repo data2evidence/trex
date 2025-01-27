@@ -21,7 +21,8 @@ members = [
   "ext/core",
   "ext/os",
   "ext/ai",
-  "ext/trex"
+  "ext/trex",
+  "ext/trex_core"
 ]
 
 [workspace.dependencies]
@@ -77,6 +78,7 @@ sb_core = { version = "0.1.0", path = "./ext/core" }
 sb_os = { version = "0.1.0", path = "./ext/os" }
 sb_ai = { version = "0.1.0", path = "./ext/ai" }
 trex = { version = "0.1.0", path = "./ext/trex" }
+trex_core = { version = "0.1.0", path = "./ext/trex_core" }
 
 # crypto
 hkdf = "0.12.3"

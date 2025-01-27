@@ -1,10 +1,16 @@
 mod core;
+pub mod clients;
+pub mod conversions;
+pub mod pipeline;
+pub mod table;
 pub use core::auth::{get_startup_handler, AuthType, TrexAuthSource};
-use core::duckdb::TrexDuckDB;
+use core::sql::TrexDuckDB;
 use core::replication::{trex_replicate, ReplicateCommand};
-
+use duckdb::Connection;
+use std::sync::{Arc, LazyLock, Mutex};
+use std::cell::LazyCell;
 use std::process::Command;
-use std::sync::Arc;
+use std::cell::OnceCell;
 
 use pgwire::api::auth::md5pass::Md5PasswordAuthStartupHandler;
 use pgwire::api::auth::DefaultServerParameterProvider;
@@ -12,6 +18,12 @@ use pgwire::api::copy::NoopCopyHandler;
 use pgwire::api::{NoopErrorHandler, PgWireServerHandlers};
 use pgwire::tokio::process_socket;
 use tokio::net::TcpListener;
+
+
+static TREX_DB: LazyLock<Arc<Mutex<Connection>>> = LazyLock::new(|| Arc::new(Mutex::new(Connection::open_in_memory().unwrap())));
+
+//static TREX_XDB: LazyCell<Connection> = LazyCell::new(|| Connection::open_in_memory().unwrap());
+
 
 pub struct TrexDuckDBFactory {
     handler: Arc<TrexDuckDB>,
@@ -65,6 +77,7 @@ pub fn add_replication(
     };
     tokio::spawn(async move {
         trex_replicate(
+            &*TREX_DB,
             command,
             duckdb_file.as_str(),
             db_host.as_str(),
@@ -96,7 +109,7 @@ pub fn install_plugin(name: String, dir: String) {
 
 pub async fn start_sql_server(ip: &str, port: u16, auth_type: AuthType) {
     let factory = Arc::new(TrexDuckDBFactory {
-        handler: Arc::new(TrexDuckDB::new()),
+        handler: Arc::new(TrexDuckDB::new(&*TREX_DB)),
         auth_type,
     });
     let _server_addr = format!("{ip}:{port}");
