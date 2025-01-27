@@ -1,16 +1,16 @@
 [package]
-name = "trex"
+name = "trex_core"
 version = "0.1.0"
 authors = [""]
 edition = "2021"
 license = "Apache-2.0"
 
 [lib]
-path = "main.rs"
+path = "lib.rs"
 
 [[bin]]
 name = "trexdb"
-path = "main.rs"
+path = "lib.rs"
 
 [dependencies]
 deno_core.workspace = true

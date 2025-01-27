@@ -7,7 +7,7 @@ mod logger;
 use anyhow::{anyhow, bail, Error};
 use base::commands::start_server;
 
-use trex::{start_sql_server, AuthType};
+use trex_core::{start_sql_server, AuthType};
 
 use base::server::{ServerFlags, Tls, WorkerEntrypoints};
 use base::utils::path::find_up;

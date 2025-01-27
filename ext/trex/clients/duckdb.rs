@@ -16,7 +16,7 @@ use crate::{
     table::{ColumnSchema, TableId, TableName, TableSchema},
 };
 
-use tracing::{info,warn};
+use tracing::{info, warn};
 
 
 pub struct DuckDbClient {

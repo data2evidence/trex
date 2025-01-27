@@ -12,7 +12,7 @@ path = "src/main.rs"
 [dependencies]
 deno_core.workspace = true
 
-trex.workspace = true
+trex_core.workspace = true
 base.workspace = true
 deno_manifest.workspace = true
 graph.workspace = true
