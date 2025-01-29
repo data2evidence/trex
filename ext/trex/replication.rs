@@ -1,6 +1,7 @@
 use std::{error::Error, time::Duration};
 use std::sync::{Arc, Mutex};
 use duckdb::Connection;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::pipeline::{
         batching::{data_pipeline::BatchDataPipeline, BatchConfig},
@@ -102,10 +103,17 @@ pub async fn trex_replicate(
     //set_log_level();
     //init_tracing();
     let mut retries = 0;
-    while retries < 10 {
+    let mut start = SystemTime::now();
+    while retries < 5 {
         let mut pipeline = create_pipeline(duckdb, command.clone(), duckdb_file, db_host, db_port, db_name, db_username, db_password.clone()).await?;
         pipeline.start().await?;
-        retries = retries + 1;
+        let duration = SystemTime::now().duration_since(start)?;
+        if duration.as_secs() < 300 {
+            retries = retries + 1;
+        } else {
+            retries = 0;
+            start = SystemTime::now();
+        }
         println!("restarting pipeline ... (try {retries})");
     }
     Ok(())

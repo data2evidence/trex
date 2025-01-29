@@ -8,10 +8,6 @@ license = "Apache-2.0"
 [lib]
 path = "lib.rs"
 
-[[bin]]
-name = "trexdb"
-path = "lib.rs"
-
 [dependencies]
 deno_core.workspace = true
 duckdb = { version = "1.1.1", default-features = false, features = ["bundled"] }
@@ -19,6 +15,7 @@ pgwire = { version = "0.28.0", default-features = false, features = ["server-api
 chrono = {version = "0.4.34", features = ["serde"] }
 tracing-subscriber.workspace = true
 thiserror = "1.0"
+arrow-json = "53.0.0"
 async-trait = { workspace = true }
 bigdecimal = { version = "0.4.6", features = ["std"] }
 bytes = { workspace = true }

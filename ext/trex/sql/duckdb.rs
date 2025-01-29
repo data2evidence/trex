@@ -4,6 +4,8 @@ use async_trait::async_trait;
 
 use duckdb::Rows;
 
+use crate::sql::auth::{get_startup_handler, AuthType, TrexAuthSource};
+
 use duckdb::{params,  Connection, Statement, ToSql};
 use pgwire::api::auth::LoginInfo;
 use pgwire::api::portal::{Format, Portal};
@@ -12,9 +14,14 @@ use pgwire::api::results::{
     DescribePortalResponse, DescribeStatementResponse, FieldInfo, QueryResponse,
     Response, Tag,
 };
+
 use pgwire::api::stmt::{NoopQueryParser, StoredStatement};
 use pgwire::api::{ClientInfo, Type};
 use pgwire::error::{PgWireError, PgWireResult};
+use pgwire::api::auth::md5pass::Md5PasswordAuthStartupHandler;
+use pgwire::api::auth::DefaultServerParameterProvider;
+use pgwire::api::copy::NoopCopyHandler;
+use pgwire::api::{NoopErrorHandler, PgWireServerHandlers};
 use crate::conversions::psql::{encode_row_data, into_pg_type};
 
 use tracing::{info, warn};
@@ -23,6 +30,40 @@ use tracing::{info, warn};
 pub struct TrexDuckDB {
     conn: Arc<Mutex<Connection>>,
     query_parser: Arc<NoopQueryParser>,
+}
+
+pub struct TrexDuckDBFactory {
+    pub handler: Arc<TrexDuckDB>,
+    pub auth_type: AuthType,
+}
+
+impl PgWireServerHandlers for TrexDuckDBFactory {
+    type StartupHandler =
+        Md5PasswordAuthStartupHandler<TrexAuthSource, DefaultServerParameterProvider>;
+    type SimpleQueryHandler = TrexDuckDB;
+    type ExtendedQueryHandler = TrexDuckDB;
+    type CopyHandler = NoopCopyHandler;
+    type ErrorHandler = NoopErrorHandler;
+
+    fn simple_query_handler(&self) -> Arc<Self::SimpleQueryHandler> {
+        self.handler.clone()
+    }
+
+    fn extended_query_handler(&self) -> Arc<Self::ExtendedQueryHandler> {
+        self.handler.clone()
+    }
+
+    fn startup_handler(&self) -> Arc<Self::StartupHandler> {
+        get_startup_handler(&self.auth_type)
+    }
+
+    fn copy_handler(&self) -> Arc<Self::CopyHandler> {
+        Arc::new(NoopCopyHandler)
+    }
+
+    fn error_handler(&self) -> Arc<Self::ErrorHandler> {
+        Arc::new(NoopErrorHandler)
+    }
 }
 
 #[async_trait]

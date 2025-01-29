@@ -5,7 +5,7 @@ apifun/
 d2e-functions-old/
 .idea/
 .idea
-db/
+data/
 plugins/
 .vscode/*
 !.vscode/launch.template.jsonc

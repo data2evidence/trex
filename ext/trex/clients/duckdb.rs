@@ -28,57 +28,12 @@ pub struct DuckDbClient {
 impl DuckDbClient {
     pub fn trexdb(conn: &Arc<Mutex<Connection>>, file_name: &str) -> Result<DuckDbClient, duckdb::Error> {
         //let conn = conn;
-        let _ = conn.lock().unwrap().execute(&format!("ATTACH IF NOT EXISTS './db/{file_name}.db' AS {file_name}"),[]);
+        let _ = conn.lock().unwrap().execute(&format!("ATTACH IF NOT EXISTS './data/cache/{file_name}.db' AS {file_name}"),[]);
         let current_database = file_name.to_string();//Self::current_database(conn)?;
         Ok(DuckDbClient {
             conn: conn.clone(),
             current_database,
         })
-    }
-    /* 
-    pub fn open_in_memory() -> Result<DuckDbClient, duckdb::Error> {
-        let conn = Connection::open_in_memory()?;
-        let current_database = Self::current_database(&conn)?;
-        Ok(DuckDbClient {
-            conn,
-            current_database,
-        })
-    }
-
-    pub fn open_file<P: AsRef<Path>>(file_name: P) -> Result<DuckDbClient, duckdb::Error> {
-        let conn = Connection::open(file_name)?;
-        let current_database = Self::current_database(&conn)?;
-        Ok(DuckDbClient {
-            conn,
-            current_database,
-        })
-    }
-
-    pub fn open_mother_duck(
-        access_token: &str,
-        db_name: &str,
-    ) -> Result<DuckDbClient, duckdb::Error> {
-        let conf = Config::default()
-            .with("motherduck_token", access_token)?
-            .with("custom_user_agent", "pg_replicate")?;
-
-        let conn = Connection::open_with_flags(format!("md:{db_name}"), conf)?;
-        let current_database = Self::current_database(&conn)?;
-        Ok(DuckDbClient {
-            conn,
-            current_database,
-        })
-    }*/
-
-    fn current_database(conn: &Arc<Mutex<Connection>>) -> Result<String, duckdb::Error> {
-        let c= conn.lock().unwrap();
-        let mut stmt = c.prepare("select current_database()")?;
-        let mut rows = stmt.query([])?;
-
-        let row = rows
-            .next()?
-            .expect("no rows returned when getting current database");
-        row.get(0)
     }
 
     pub fn create_schema_if_missing(&self, schema_name: &str) -> Result<(), duckdb::Error> {

@@ -4,7 +4,7 @@ core
 crates
 examples
 k6
-db
+data
 test
 node_modules
 plugins

@@ -151,7 +151,7 @@ Deno.serve(async (req: Request) => {
         );
     }
 
-    const servicePath = `./examples/${service_name}`;
+    const servicePath = `./test/${service_name}`;
     // console.error(`serving the request with ${servicePath}`);
 
 
@@ -202,11 +202,6 @@ Deno.serve(async (req: Request) => {
 
     return callWorker();
 });
-
-
-
-
-
 
 const baseDir ="./test/_test/";
 for await (const dirEntry of Deno.readDir(baseDir)) {
