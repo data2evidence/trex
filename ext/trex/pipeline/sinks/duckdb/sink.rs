@@ -48,66 +48,6 @@ impl DuckDbSink {
         })
     }
 
-    /*pub async fn file<P: AsRef<Path>>(file_name: P) -> Result<DuckDbSink, duckdb::Error> {
-        let (req_sender, req_receiver) = channel(CHANNEL_SIZE);
-        let (res_sender, res_receiver) = channel(CHANNEL_SIZE);
-        let client = DuckDbClient::open_file(file_name)?;
-        let executor = DuckDbExecutor {
-            client,
-            req_receiver,
-            res_sender,
-            table_schemas: None,
-            final_lsn: None,
-            committed_lsn: None,
-        };
-        executor.start();
-        Ok(DuckDbSink {
-            req_sender,
-            res_receiver,
-        })
-    }*/
-
-    /*pub async fn mother_duck(
-        access_token: &str,
-        db_name: &str,
-    ) -> Result<DuckDbSink, duckdb::Error> {
-        let (req_sender, req_receiver) = channel(CHANNEL_SIZE);
-        let (res_sender, res_receiver) = channel(CHANNEL_SIZE);
-        let client = DuckDbClient::open_mother_duck(access_token, db_name)?;
-        let executor = DuckDbExecutor {
-            client,
-            req_receiver,
-            res_sender,
-            table_schemas: None,
-            final_lsn: None,
-            committed_lsn: None,
-        };
-        executor.start();
-        Ok(DuckDbSink {
-            req_sender,
-            res_receiver,
-        })
-    }
-
-    pub async fn in_memory() -> Result<DuckDbSink, duckdb::Error> {
-        let (req_sender, req_receiver) = channel(CHANNEL_SIZE);
-        let (res_sender, res_receiver) = channel(CHANNEL_SIZE);
-        let client = DuckDbClient::open_in_memory()?;
-        let executor = DuckDbExecutor {
-            client,
-            req_receiver,
-            res_sender,
-            table_schemas: None,
-            final_lsn: None,
-            committed_lsn: None,
-        };
-        executor.start();
-        Ok(DuckDbSink {
-            req_sender,
-            res_receiver,
-        })
-    }*/
-
     pub async fn execute(
         &mut self,
         req: DuckDbRequest,

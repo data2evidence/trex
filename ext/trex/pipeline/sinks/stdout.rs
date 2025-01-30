@@ -5,9 +5,9 @@ use tokio_postgres::types::PgLsn;
 use tracing::info;
 
 use crate::{
+    conversions::table::{TableId, TableSchema},
     conversions::{cdc_event::CdcEvent, table_row::TableRow},
     pipeline::PipelineResumptionState,
-    conversions::table::{TableId, TableSchema},
 };
 
 use super::{BatchSink, InfallibleSinkError};
