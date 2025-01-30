@@ -1,15 +1,15 @@
-use std::{error::Error, time::Duration};
-use std::sync::{Arc, Mutex};
 use duckdb::Connection;
+use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
+use std::{error::Error, time::Duration};
 
 use crate::pipeline::{
-        batching::{data_pipeline::BatchDataPipeline, BatchConfig},
-        sinks::duckdb::DuckDbSink,
-        sources::postgres::{PostgresSource, TableNamesFrom},
-        PipelineAction,
-    };
-    //table::TableName,
+    batching::{data_pipeline::BatchDataPipeline, BatchConfig},
+    sinks::duckdb::DuckDbSink,
+    sources::postgres::{PostgresSource, TableNamesFrom},
+    PipelineAction,
+};
+//table::TableName,
 
 //use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -41,7 +41,8 @@ fn set_log_level() {
 */
 
 #[allow(clippy::too_many_arguments)]
-async fn create_pipeline(duckdb: &Arc<Mutex<Connection>>,
+async fn create_pipeline(
+    duckdb: &Arc<Mutex<Connection>>,
     command: ReplicateCommand,
     duckdb_file: &str,
     db_host: &str,
@@ -49,7 +50,7 @@ async fn create_pipeline(duckdb: &Arc<Mutex<Connection>>,
     db_name: &str,
     db_username: &str,
     db_password: Option<String>,
-) -> Result<BatchDataPipeline<PostgresSource, DuckDbSink>, Box<dyn Error>>{
+) -> Result<BatchDataPipeline<PostgresSource, DuckDbSink>, Box<dyn Error>> {
     let (postgres_source, action) = match command {
         /* ReplicateCommand::CopyTable { schema, name } => {
             let table_names = vec![TableName { schema, name }];
@@ -85,10 +86,15 @@ async fn create_pipeline(duckdb: &Arc<Mutex<Connection>>,
         }
     };
 
-    let duckdb_sink: DuckDbSink = DuckDbSink::trexdb(duckdb, duckdb_file).await?;//DuckDbSink::file(duckdb_file).await?;//
+    let duckdb_sink: DuckDbSink = DuckDbSink::trexdb(duckdb, duckdb_file).await?; //DuckDbSink::file(duckdb_file).await?;//
 
     let batch_config = BatchConfig::new(100000, Duration::from_secs(10));
-    Ok(BatchDataPipeline::new(postgres_source, duckdb_sink, action, batch_config))
+    Ok(BatchDataPipeline::new(
+        postgres_source,
+        duckdb_sink,
+        action,
+        batch_config,
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -107,7 +113,17 @@ pub async fn trex_replicate(
     let mut retries = 0;
     let mut start = SystemTime::now();
     while retries < 5 {
-        let mut pipeline = create_pipeline(duckdb, command.clone(), duckdb_file, db_host, db_port, db_name, db_username, db_password.clone()).await?;
+        let mut pipeline = create_pipeline(
+            duckdb,
+            command.clone(),
+            duckdb_file,
+            db_host,
+            db_port,
+            db_name,
+            db_username,
+            db_password.clone(),
+        )
+        .await?;
         pipeline.start().await?;
         let duration = SystemTime::now().duration_since(start)?;
         if duration.as_secs() < 300 {

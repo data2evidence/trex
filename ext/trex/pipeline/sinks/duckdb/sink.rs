@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use async_trait::async_trait;
-use tokio_postgres::types::PgLsn;
-use std::sync::{Arc, Mutex};
 use duckdb::Connection;
+use std::sync::{Arc, Mutex};
+use tokio_postgres::types::PgLsn;
 
 use crate::{
     clients::duckdb::DuckDbClient,
@@ -26,8 +26,10 @@ pub struct DuckDbSink {
 const CHANNEL_SIZE: usize = 32;
 
 impl DuckDbSink {
-
-    pub async fn trexdb(conn: &Arc<Mutex<Connection>>, file_name: &str) -> Result<DuckDbSink, duckdb::Error> {
+    pub async fn trexdb(
+        conn: &Arc<Mutex<Connection>>,
+        file_name: &str,
+    ) -> Result<DuckDbSink, duckdb::Error> {
         let (req_sender, req_receiver) = channel(CHANNEL_SIZE);
         let (res_sender, res_receiver) = channel(CHANNEL_SIZE);
         let client = DuckDbClient::trexdb(conn, file_name)?;
@@ -164,7 +166,7 @@ impl BatchSink for DuckDbSink {
                 _ => panic!("invalid response to InsertRow request"),
             }
         }*/
-        let req = DuckDbRequest::InsertRows(rows, table_id); 
+        let req = DuckDbRequest::InsertRows(rows, table_id);
         match self.execute(req).await? {
             DuckDbResponse::InsertRowsResponse(res) => {
                 let _ = res?;

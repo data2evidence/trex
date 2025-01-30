@@ -1,19 +1,15 @@
-use pgwire::messages::data::DataRow;
-use chrono::{TimeDelta, DateTime};
+use chrono::{DateTime, TimeDelta};
 use duckdb::Rows;
-use futures::Stream;
 use futures::stream;
+use futures::Stream;
+use pgwire::messages::data::DataRow;
 use std::sync::Arc;
 
 use duckdb::arrow::datatypes::DataType;
-use pgwire::api::results::{
-    DataRowEncoder, FieldInfo,
-};
+use duckdb::types::ValueRef;
+use pgwire::api::results::{DataRowEncoder, FieldInfo};
 use pgwire::api::Type;
 use pgwire::error::{ErrorInfo, PgWireError, PgWireResult};
-use duckdb::types::ValueRef;
-
-
 
 pub fn into_pg_type(df_type: &DataType) -> PgWireResult<Type> {
     Ok(match df_type {
@@ -62,7 +58,6 @@ pub fn into_pg_type(df_type: &DataType) -> PgWireResult<Type> {
     })
 }
 
-
 pub fn encode_row_data(
     mut rows: Rows<'_>,
     schema: Arc<Vec<FieldInfo>>,
@@ -107,7 +102,6 @@ pub fn encode_row_data(
                     if t2 < 0 {
                         t3 = -t2;
                         t2 = 0;
-
                     }
                     encoder
                         .encode_field(

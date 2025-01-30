@@ -6,26 +6,24 @@ use duckdb::Rows;
 
 use crate::sql::auth::{get_startup_handler, AuthType, TrexAuthSource};
 
-use duckdb::{params,  Connection, Statement, ToSql};
+use duckdb::{params, Connection, Statement, ToSql};
 use pgwire::api::auth::LoginInfo;
 use pgwire::api::portal::{Format, Portal};
 use pgwire::api::query::{ExtendedQueryHandler, SimpleQueryHandler};
 use pgwire::api::results::{
-    DescribePortalResponse, DescribeStatementResponse, FieldInfo, QueryResponse,
-    Response, Tag,
+    DescribePortalResponse, DescribeStatementResponse, FieldInfo, QueryResponse, Response, Tag,
 };
 
-use pgwire::api::stmt::{NoopQueryParser, StoredStatement};
-use pgwire::api::{ClientInfo, Type};
-use pgwire::error::{PgWireError, PgWireResult};
+use crate::clients::pgwire::{encode_row_data, into_pg_type};
 use pgwire::api::auth::md5pass::Md5PasswordAuthStartupHandler;
 use pgwire::api::auth::DefaultServerParameterProvider;
 use pgwire::api::copy::NoopCopyHandler;
+use pgwire::api::stmt::{NoopQueryParser, StoredStatement};
+use pgwire::api::{ClientInfo, Type};
 use pgwire::api::{NoopErrorHandler, PgWireServerHandlers};
-use crate::clients::pgwire::{encode_row_data, into_pg_type};
+use pgwire::error::{PgWireError, PgWireResult};
 
 use tracing::info;
-
 
 pub struct TrexDuckDB {
     conn: Arc<Mutex<Connection>>,
@@ -119,10 +117,10 @@ impl SimpleQueryHandler for TrexDuckDB {
 }
 
 fn set_db(conn: &MutexGuard<'_, Connection>, db: &str) {
-     let _ = conn
-         .execute(&format!("USE {db}"), params![])
-         .map_err(|error| println!("ERROR: {error}"));
- }
+    let _ = conn
+        .execute(&format!("USE {db}"), params![])
+        .map_err(|error| println!("ERROR: {error}"));
+}
 
 fn row_desc_from_row(rows: &Rows, format: &Format) -> PgWireResult<Vec<FieldInfo>> {
     let stmt = rows.as_ref().unwrap();
@@ -240,8 +238,6 @@ impl ExtendedQueryHandler for TrexDuckDB {
     }
 }
 
-
-
 fn get_params(portal: &Portal<String>) -> Vec<Box<dyn ToSql>> {
     let mut results = Vec::with_capacity(portal.parameter_len());
     for i in 0..portal.parameter_len() {
@@ -293,5 +289,3 @@ impl TrexDuckDB {
         }
     }
 }
-
-
