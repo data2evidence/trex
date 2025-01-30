@@ -9,9 +9,9 @@ use tokio_postgres::types::PgLsn;
 
 use crate::{
     clients::duckdb::DuckDbClient,
+    conversions::table::{TableId, TableSchema},
     conversions::{cdc_event::CdcEvent, table_row::TableRow},
     pipeline::{sinks::BatchSink, PipelineResumptionState},
-    table::{TableId, TableSchema},
 };
 
 use super::{

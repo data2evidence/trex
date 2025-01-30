@@ -9,9 +9,10 @@ use duckdb::{
 };
 use tokio_postgres::types::{PgLsn, Type};
 
-use crate::{
-    conversions::{table_row::TableRow, ArrayCell, Cell},
+use crate::conversions::{
     table::{ColumnSchema, TableId, TableName, TableSchema},
+    table_row::TableRow,
+    ArrayCell, Cell,
 };
 
 use tracing::{info, warn};

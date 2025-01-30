@@ -3,7 +3,6 @@ pub mod conversions;
 pub mod pipeline;
 pub mod replication;
 pub mod sql;
-pub mod table;
 use deno_core::error::AnyError;
 use deno_core::op2;
 use duckdb::arrow::record_batch::RecordBatch;

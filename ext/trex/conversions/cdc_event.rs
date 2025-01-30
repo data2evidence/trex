@@ -8,8 +8,8 @@ use postgres_replication::protocol::{
 use thiserror::Error;
 
 use crate::{
+    conversions::table::{ColumnSchema, TableId, TableSchema},
     pipeline::batching::BatchBoundary,
-    table::{ColumnSchema, TableId, TableSchema},
 };
 
 use super::{

@@ -4,9 +4,10 @@ use async_trait::async_trait;
 use thiserror::Error;
 use tokio_postgres::types::PgLsn;
 
-use crate::{
-    conversions::{cdc_event::CdcEvent, table_row::TableRow},
+use crate::conversions::{
+    cdc_event::CdcEvent,
     table::{TableId, TableSchema},
+    table_row::TableRow,
 };
 
 use super::PipelineResumptionState;

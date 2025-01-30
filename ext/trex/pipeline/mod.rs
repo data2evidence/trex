@@ -5,7 +5,7 @@ use sources::SourceError;
 use thiserror::Error;
 use tokio_postgres::types::PgLsn;
 
-use crate::table::TableId;
+use crate::conversions::table::TableId;
 
 pub mod batching;
 pub mod sinks;

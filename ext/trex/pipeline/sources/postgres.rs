@@ -17,9 +17,9 @@ use crate::{
     clients::postgres::{ReplicationClient, ReplicationClientError},
     conversions::{
         cdc_event::{CdcEvent, CdcEventConversionError, CdcEventConverter},
+        table::{ColumnSchema, TableId, TableName, TableSchema},
         table_row::{TableRow, TableRowConversionError, TableRowConverter},
     },
-    table::{ColumnSchema, TableId, TableName, TableSchema},
 };
 
 use super::{Source, SourceError};

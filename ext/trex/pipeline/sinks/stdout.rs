@@ -7,7 +7,7 @@ use tracing::info;
 use crate::{
     conversions::{cdc_event::CdcEvent, table_row::TableRow},
     pipeline::PipelineResumptionState,
-    table::{TableId, TableSchema},
+    conversions::table::{TableId, TableSchema},
 };
 
 use super::{BatchSink, InfallibleSinkError};

@@ -7,13 +7,13 @@ use tracing::{debug, info};
 
 use crate::{
     conversions::cdc_event::{CdcEvent, CdcEventConversionError},
+    conversions::table::TableId,
     pipeline::{
         batching::stream::BatchTimeoutStream,
         sinks::BatchSink,
         sources::{postgres::CdcStreamError, CommonSourceError, Source},
         PipelineAction, PipelineError,
     },
-    table::TableId,
 };
 
 use super::BatchConfig;

@@ -10,7 +10,7 @@ use tokio_postgres::{
 };
 use tracing::{info, warn};
 
-use crate::table::{ColumnSchema, TableId, TableName, TableSchema};
+use crate::conversions::table::{ColumnSchema, TableId, TableName, TableSchema};
 
 pub struct SlotInfo {
     pub confirmed_flush_lsn: PgLsn,

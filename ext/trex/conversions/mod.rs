@@ -8,6 +8,7 @@ pub mod bool;
 pub mod cdc_event;
 pub mod hex;
 pub mod numeric;
+pub mod table;
 pub mod table_row;
 pub mod text;
 
