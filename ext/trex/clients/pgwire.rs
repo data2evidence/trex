@@ -3,15 +3,15 @@ use chrono::{TimeDelta, DateTime};
 use duckdb::Rows;
 use futures::Stream;
 use futures::stream;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::Arc;
 
 use duckdb::arrow::datatypes::DataType;
 use pgwire::api::results::{
     DataRowEncoder, FieldInfo,
 };
-use pgwire::api::{ClientInfo, Type};
+use pgwire::api::Type;
 use pgwire::error::{ErrorInfo, PgWireError, PgWireResult};
-use duckdb::{params, types::ValueRef, Connection, Statement, ToSql};
+use duckdb::types::ValueRef;
 
 
 
@@ -102,19 +102,18 @@ pub fn encode_row_data(
                         .unwrap();
                 }
                 ValueRef::Date32(d) => {
-                    //TODO: TREX FIX CONVERSION
-                    let mut t2: i64 = i64::from(d);
+                    let mut t2 = i64::from(d);
                     let mut t3 = 0;
                     if t2 < 0 {
+                        t3 = -t2;
                         t2 = 0;
-                        t3 = t2;
+
                     }
-                    //println!("TIME: {time} {t2}");
                     encoder
                         .encode_field(
                             &DateTime::from_timestamp(t2, 0)
                                 .expect("TREX: Date conversion failed")
-                                .checked_sub_signed(TimeDelta::nanoseconds(t3))
+                                .checked_sub_signed(TimeDelta::seconds(t3))
                                 .expect("TREX: Date conversion failed")
                                 .format("%Y-%m-%d")
                                 .to_string(),
@@ -122,19 +121,17 @@ pub fn encode_row_data(
                         .unwrap();
                 }
                 ValueRef::Timestamp(_unit, time) => {
-                    //TODO: TREX FIX CONVERSION
                     let mut t2 = time / 1000 / 1000;
                     let mut t3 = 0;
                     if t2 < 0 {
+                        t3 = -t2;
                         t2 = 0;
-                        t3 = t2;
                     }
-                    //println!("TIME: {time} {t2}");
                     encoder
                         .encode_field(
                             &DateTime::from_timestamp(t2, 0)
                                 .expect("TREX: Date conversion failed")
-                                .checked_sub_signed(TimeDelta::nanoseconds(t3))
+                                .checked_sub_signed(TimeDelta::seconds(t3))
                                 .expect("TREX: Date conversion failed")
                                 .format("%Y-%m-%d %H:%M:%S")
                                 .to_string(),

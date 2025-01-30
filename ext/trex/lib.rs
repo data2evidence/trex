@@ -7,24 +7,23 @@ pub mod replication;
 use deno_core::error::AnyError;
 pub use sql::{auth::AuthType, duckdb::{TrexDuckDB, TrexDuckDBFactory}};
 use replication::{trex_replicate, ReplicateCommand};
-use duckdb::{ToSql, types::ToSqlOutput, types::Value, ffi, Arrow, Connection, Error, Result, params_from_iter, ffi::duckdb_type};
+use duckdb::{ToSql, types::ToSqlOutput, types::Value, Connection, Result, params_from_iter};
 use duckdb::arrow::record_batch::RecordBatch;
-use uuid::Timestamp;
-//use arrow_json::ArrowWriter;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::process::Command;
-use chrono::NaiveDateTime;
 use serde::{Serialize, Deserialize};
 use deno_core::op2;
 use pgwire::tokio::process_socket;
 use tokio::net::TcpListener;
-use tracing::{info, warn};
+use tracing::warn;
 
 static TREX_DB: LazyLock<Arc<Mutex<Connection>>> = LazyLock::new(|| Arc::new(Mutex::new(Connection::open_in_memory().unwrap())));
 
+
+
 pub async fn start_sql_server(ip: &str, port: u16, auth_type: AuthType) {
     let factory = Arc::new(TrexDuckDBFactory {
-        handler: Arc::new(TrexDuckDB::new(&*TREX_DB)),
+        handler: Arc::new(TrexDuckDB::new(&TREX_DB)),
         auth_type,
     });
     let _server_addr = format!("{ip}:{port}");
@@ -58,7 +57,7 @@ fn op_add_replication(
     };
     tokio::spawn(async move {
         trex_replicate(
-            &*TREX_DB,
+            &TREX_DB,
             command,
             duckdb_file.as_str(),
             db_host.as_str(),
@@ -101,7 +100,7 @@ impl ToSql for TrexType {
     fn to_sql(&self) -> duckdb::Result<ToSqlOutput<'_>> {
         match self {
             TrexType::Integer(v) => {
-                let value: Value = v.clone().into();
+                let value: Value = (*v).into();
                  Ok(ToSqlOutput::Owned(value))
             },
             TrexType::String(v) => {
@@ -109,11 +108,11 @@ impl ToSql for TrexType {
                  Ok(ToSqlOutput::Owned(value))
             },
             TrexType::DateTime(v) => {
-                let value: Value = Value::Timestamp(duckdb::types::TimeUnit::Millisecond, v.clone().into());
+                let value: Value = Value::Timestamp(duckdb::types::TimeUnit::Millisecond, *v);
                  Ok(ToSqlOutput::Owned(value))
             },
             TrexType::Number(v) => {
-                let value: Value = v.clone().into();
+                let value: Value = (*v).into();
                  Ok(ToSqlOutput::Owned(value))
             },
         }

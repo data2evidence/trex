@@ -52,4 +52,5 @@ tracing-subscriber = { workspace = true, default-features = true, features = [
 [features]
 unknown_types_to_bytes = []
 duckdb = []
+stdout = []
 default = ["unknown_types_to_bytes", "duckdb"]

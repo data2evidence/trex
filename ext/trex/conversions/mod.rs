@@ -10,7 +10,6 @@ pub mod hex;
 pub mod numeric;
 pub mod table_row;
 pub mod text;
-pub mod psql;
 
 #[derive(Debug, Clone)]
 pub enum Cell {

@@ -1,7 +1,7 @@
 use std::{error::Error, time::Duration};
 use std::sync::{Arc, Mutex};
 use duckdb::Connection;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 
 use crate::pipeline::{
         batching::{data_pipeline::BatchDataPipeline, BatchConfig},
@@ -40,6 +40,7 @@ fn set_log_level() {
 }
 */
 
+#[allow(clippy::too_many_arguments)]
 async fn create_pipeline(duckdb: &Arc<Mutex<Connection>>,
     command: ReplicateCommand,
     duckdb_file: &str,
@@ -90,6 +91,7 @@ async fn create_pipeline(duckdb: &Arc<Mutex<Connection>>,
     Ok(BatchDataPipeline::new(postgres_source, duckdb_sink, action, batch_config))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn trex_replicate(
     duckdb: &Arc<Mutex<Connection>>,
     command: ReplicateCommand,
@@ -109,7 +111,7 @@ pub async fn trex_replicate(
         pipeline.start().await?;
         let duration = SystemTime::now().duration_since(start)?;
         if duration.as_secs() < 300 {
-            retries = retries + 1;
+            retries += 1;
         } else {
             retries = 0;
             start = SystemTime::now();

@@ -143,7 +143,6 @@ impl deno_websocket::WebSocketPermissions for Permissions {
 
 /// TODO: File system should be protected even if it's for main.
 /// Some sort of permission before main is boostrapped should be put in place
-
 impl deno_fs::FsPermissions for Permissions {
     fn check_open<'a>(
         &mut self,

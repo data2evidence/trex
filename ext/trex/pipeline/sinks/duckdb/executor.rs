@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 use tokio::sync::mpsc::{error::SendError, Receiver, Sender};
 use tokio_postgres::types::{PgLsn, Type};
-use tracing::{error, info};
+use tracing::error;
 
 use crate::{
     clients::duckdb::DuckDbClient,

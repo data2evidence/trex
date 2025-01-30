@@ -5,7 +5,7 @@ use postgres_replication::LogicalReplicationStream;
 use thiserror::Error;
 use tokio_postgres::{
     config::ReplicationMode,
-    types::{Kind, PgLsn, Type, ToSql},
+    types::{Kind, PgLsn, Type},
     Client as PostgresClient, Config, CopyOutStream, NoTls, SimpleQueryMessage,
 };
 use tracing::{info, warn};

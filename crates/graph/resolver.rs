@@ -648,6 +648,7 @@ pub struct WorkerCliNpmGraphResolver<'a> {
     bare_node_builtins_enabled: bool,
 }
 
+#[allow(clippy::needless_lifetimes)]
 #[async_trait(?Send)]
 impl<'a> deno_graph::source::NpmResolver for WorkerCliNpmGraphResolver<'a> {
     fn resolve_builtin_node_module(

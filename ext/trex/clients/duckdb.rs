@@ -1,13 +1,11 @@
-use std::{collections::HashSet, path::Path};
-use std::sync::{Arc, Mutex, MutexGuard};
-use deno_core::v8::Global;
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
 
 use duckdb::appender_params_from_iter;
 use duckdb::{
-    params,
     params_from_iter,
     types::{ToSqlOutput, Value},
-    Config, Connection, ToSql
+    Connection, ToSql
 };
 use tokio_postgres::types::{PgLsn, Type};
 
@@ -131,13 +129,13 @@ impl DuckDbClient {
         p.push_str("PRIMARY KEY (");
         s.push('(');
 
-        for (i, column_schema) in column_schemas.iter().enumerate() {
+        for column_schema in column_schemas {
             Self::duckdb_column_spec(column_schema, &mut s);
             //if i < column_schemas.len() - 1 {
             s.push_str(", ");
             //}
             if column_schema.primary {
-                if p.chars().last().unwrap() != '(' {
+                if !p.ends_with('(') {
                     p.push_str(", ");
 
                 }
@@ -219,7 +217,7 @@ impl DuckDbClient {
         query.push_str(" values");
         for table_row in table_rows {
             let column_count = table_row.values.len();
-            if query.chars().last().unwrap() != 's' {
+            if !query.ends_with('s') {
                 query.push(',');
             }
             query.push_str(" (");

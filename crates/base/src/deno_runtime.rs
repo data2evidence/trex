@@ -1532,6 +1532,7 @@ pub enum MaybeDenoRuntime<'l, RuntimeContext> {
     IsolateWithCancellationToken(IsolateWithCancellationToken<'l>),
 }
 
+#[allow(clippy::needless_lifetimes)]
 impl<'l, RuntimeContext> MaybeDenoRuntime<'l, RuntimeContext>
 where
     RuntimeContext: GetRuntimeContext,
@@ -1584,6 +1585,7 @@ where
         }
     }
 
+    #[allow(elided_named_lifetimes)]
     fn dispatch_event_with_callback<T, U, V, R>(
         &mut self,
         select_dispatch_fn: T,

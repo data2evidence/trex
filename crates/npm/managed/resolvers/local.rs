@@ -461,6 +461,7 @@ struct SetupCacheDep<'a> {
     current: &'a mut BTreeMap<String, String>,
 }
 
+#[allow(clippy::needless_lifetimes)]
 impl<'a> SetupCacheDep<'a> {
     pub fn insert(&mut self, name: &str, target_folder_name: &str) -> bool {
         self.current

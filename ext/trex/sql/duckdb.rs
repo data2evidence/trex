@@ -22,9 +22,9 @@ use pgwire::api::auth::md5pass::Md5PasswordAuthStartupHandler;
 use pgwire::api::auth::DefaultServerParameterProvider;
 use pgwire::api::copy::NoopCopyHandler;
 use pgwire::api::{NoopErrorHandler, PgWireServerHandlers};
-use crate::conversions::psql::{encode_row_data, into_pg_type};
+use crate::clients::pgwire::{encode_row_data, into_pg_type};
 
-use tracing::{info, warn};
+use tracing::info;
 
 
 pub struct TrexDuckDB {
