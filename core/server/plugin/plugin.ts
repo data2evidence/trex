@@ -104,8 +104,8 @@ export class Plugins {
 			logger.log(`skipping plugin install ${name} - already installed`)
 			pkg = {name: _plugin.name, version: _plugin.version, trex: _plugin.payload}
 		} else {
-			
-			await Trex.installPlugin(pkgurl, `${env.PLUGINS_PATH}`)
+			const pm = new Trex.PluginManager(`${env.PLUGINS_PATH}`);
+			await pm.install(pkgurl);
 			pkg = JSON.parse(await Deno.readTextFile(`${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/package.json`));
 		}
 		await this.addPlugin(app, `${env.PLUGINS_PATH}/node_modules/@${env.GH_ORG}/${name}/`, pkg, name);
