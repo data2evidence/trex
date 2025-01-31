@@ -48,6 +48,8 @@ jobs:
         run: rm .npmrc
       - name: Build
         run: cargo build --profile release
+      - name: Cargo strip
+        run: cargo strip
       - name: cp
         run: cp target/release/trex trex
       - name: Update version
