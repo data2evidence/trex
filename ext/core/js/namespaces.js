@@ -64,7 +64,7 @@ function installEdgeRuntimeNamespace(kind, terminationRequestTokenRid) {
 	switch (kind) {
 		case "main":
 			propsTrex = {
-				ai,
+				ai: MAIN_WORKER_API,
 				userWorkers: SUPABASE_USER_WORKERS,
 				getRuntimeMetrics: () => /* async */ ops.op_runtime_metrics(),
 				applySupabaseTag: (src, dest) => applySupabaseTag(src, dest),
