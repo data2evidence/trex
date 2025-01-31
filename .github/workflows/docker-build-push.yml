@@ -30,7 +30,8 @@ env:
 
 jobs:
   build-push-image:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: trex
     strategy:
       matrix:
         include:

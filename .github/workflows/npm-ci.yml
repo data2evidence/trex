@@ -38,16 +38,21 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: trex
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.GIT_BRANCH_NAME }}
           repository: ${{ env.GIT_REPO_FULL_NAME }}
+      - name: Install cargo strip
+        run: cargo install cargo-strip
       - name: rm npmrc
         run: rm .npmrc
       - name: Build
         run: cargo build --profile release
+      - name: Cargo strip
+        run: cargo strip
       - name: cp
         run: cp target/release/trex trex
       - name: Update version
