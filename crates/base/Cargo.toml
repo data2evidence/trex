@@ -42,6 +42,7 @@ sb_core.workspace = true
 sb_os.workspace = true
 sb_node.workspace = true
 sb_ai.workspace = true
+trex_core.workspace = true
 
 libc.workspace = true
 async-trait.workspace = true
@@ -129,6 +130,7 @@ sb_env.workspace = true
 sb_os.workspace = true
 sb_node.workspace = true
 sb_ai.workspace = true
+trex_core.workspace = true
 
 url.workspace = true
 

@@ -49,7 +49,7 @@ jobs:
       - name: Build
         run: cargo build --profile release
       - name: cp
-        run: cp target/release/edge-runtime trex
+        run: cp target/release/trex trex
       - name: Update version
         run: |
           if [[ $GITHUB_EVENT_NAME == 'workflow_dispatch' ]]; then

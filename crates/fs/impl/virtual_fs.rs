@@ -289,6 +289,7 @@ enum VfsEntryRef<'a> {
     Symlink(&'a VirtualSymlink),
 }
 
+#[allow(clippy::needless_lifetimes)]
 impl<'a> VfsEntryRef<'a> {
     pub fn as_fs_stat(&self) -> FsStat {
         match self {

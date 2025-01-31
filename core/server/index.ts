@@ -5,6 +5,7 @@ import {addPortalRoute} from "./routes/portal.ts"
 import {Plugins} from "./plugin/plugin.ts"
 import { addBaseRoutes } from "./routes/base.ts";
 import { addPluginRoutes} from "./routes/plugin.ts"
+import { addDBManagementRoutes} from "./routes/dbm.ts"
 
 logger.log('🦖 TREX DB initializing 🦖');
 
@@ -20,6 +21,7 @@ const app = new Hono();
 app.use(hlogger())
 
 addBaseRoutes(app);
+addDBManagementRoutes(app);
 addPortalRoute(app);
 await Plugins.initPlugins(app);
 addPluginRoutes(app);

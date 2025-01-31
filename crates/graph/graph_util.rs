@@ -569,6 +569,7 @@ pub fn format_range(range: &deno_graph::Range) -> String {
 
 struct LockfileLocker<'a>(&'a Arc<Mutex<Lockfile>>);
 
+#[allow(clippy::needless_lifetimes)]
 impl<'a> deno_graph::source::Locker for LockfileLocker<'a> {
     fn get_remote_checksum(&self, specifier: &deno_ast::ModuleSpecifier) -> Option<LoaderChecksum> {
         self.0

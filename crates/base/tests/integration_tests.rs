@@ -26,6 +26,8 @@ use base::{
     server::{Server, ServerEvent, ServerFlags, ServerHealth, Tls},
     worker, DecoratorType,
 };
+
+#[allow(unused_imports)]
 use base::{
     utils::test_utils::{
         self, create_test_user_worker, test_user_runtime_opts, test_user_worker_pool_policy,

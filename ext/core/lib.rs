@@ -14,7 +14,6 @@ use futures::task::AtomicWaker;
 use futures::FutureExt;
 use log::error;
 use serde::Serialize;
-use std::process::Command;
 use tokio::sync::oneshot;
 use tracing::{debug, debug_span};
 
@@ -325,23 +324,6 @@ fn op_runtime_memory_usage(scope: &mut v8::HandleScope) -> MemoryUsage {
     }
 }
 
-#[op2(fast)]
-fn op_install_plugin(#[string] name: String, #[string] dir: String) {
-    Command::new("npx")
-        .args([
-            "bun",
-            "install",
-            "-f",
-            "--silent",
-            "--no-cache",
-            "--no-save",
-            &name,
-        ])
-        .current_dir(dir)
-        .status()
-        .expect("failed to execute process");
-}
-
 #[op2]
 #[string]
 pub fn op_read_line_prompt(
@@ -442,7 +424,6 @@ deno_core::extension!(
         op_read_line_prompt,
         op_set_exit_code,
         op_runtime_metrics,
-        op_install_plugin,
         op_schedule_mem_check,
         op_runtime_memory_usage,
         op_set_raw,

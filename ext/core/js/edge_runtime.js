@@ -4,6 +4,7 @@ import { MAIN_WORKER_API as ai } from "ext:sb_ai/js/ai.js";
 import { SUPABASE_USER_WORKERS } from "ext:sb_user_workers/user_workers.js";
 import { applySupabaseTag } from "ext:sb_core_main_js/js/http.js";
 import { waitUntil } from "ext:sb_core_main_js/js/async_hook.js";
+import { op_add_replication, PluginManager, TrexDB } from "ext:sb_trex/js/trex_lib.js";
 
 const ops = core.ops;
 const { ObjectDefineProperty } = primordials;
@@ -69,7 +70,10 @@ function installEdgeRuntimeNamespace(kind, terminationRequestTokenRid) {
 				applySupabaseTag: (src, dest) => applySupabaseTag(src, dest),
 				systemMemoryInfo: () => ops.op_system_memory_info(),
 				raiseSegfault: () => ops.op_raise_segfault(),
-				installPlugin: (name, dir) => /* async */ ops.op_install_plugin(name, dir),
+				PluginManager: PluginManager,
+				TrexDB: TrexDB,
+				addReplication: op_add_replication,
+				addDB: op_add_replication,
 				...propsTrex,
 			};
 			break;
@@ -82,7 +86,8 @@ function installEdgeRuntimeNamespace(kind, terminationRequestTokenRid) {
 
 		case "user":
 			propsTrex = {
-				waitUntil
+				waitUntil,
+				TrexDB: TrexDB,
 			};
 			break;
 	}

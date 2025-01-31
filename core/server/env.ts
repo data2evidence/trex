@@ -3,11 +3,16 @@ export let global = {
     REQUIRED_URL_SCOPES: [{
       "path": "^/trex/plugins(.*)",
       "scopes": [
-        "plugins"
+        "trex"
+      ]
+    },{
+      "path": "^/trex/db(.*)",
+      "scopes": [
+        "trex"
       ]
     }],
     ROLE_SCOPES: {
-      "ALP_SYSTEM_ADMIN": ['plugins']
+      "ALP_SYSTEM_ADMIN": ['trex']
     },
     PLUGINS_JSON: "{}"
 }
