@@ -78,7 +78,8 @@ export const env = {
     PLUGINS_PATH: _env.PLUGINS_PATH || "./plugin",
     PLUGINS_API_VERSION: _env.PLUGINS_API_VERSION || 'latest',
     PLUGINS_INIT: _env.PLUGINS_SEED? JSON.parse(_env.PLUGINS_SEED) : [],
-    PLUGINS_SEED_UPDATE: _env.PLUGINS_SEED_UPDATE || false
+    PLUGINS_SEED_UPDATE: _env.PLUGINS_SEED_UPDATE || false,
+    PLUGINS_PULL_POLICY: _env.PLUGINS_PULL_POLICY || 'IfNotPresent',
 
 }
 

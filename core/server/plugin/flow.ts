@@ -39,7 +39,7 @@ export async function addFlowPlugin(value) {
 						enforce_parameter_schema: false,
 						job_variables: {
 							image: f.image,
-							image_pull_policy: f.image_pull_policy,
+							image_pull_policy: env.PLUGINS_PULL_POLICY,
 							volumes: env.PREFECT_DOCKER_VOLUMES,
 							networks: [env.PREFECT_DOCKER_NETWORK]
 						},
