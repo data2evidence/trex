@@ -45,6 +45,8 @@ jobs:
         with:
           ref: ${{ env.GIT_BRANCH_NAME }}
           repository: ${{ env.GIT_REPO_FULL_NAME }}
+      - name: Install cargo strip
+        run: cargo install cargo-strip
       - name: rm npmrc
         run: rm .npmrc
       - name: Build
