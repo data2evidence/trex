@@ -2,6 +2,7 @@ import {env, global, logger} from "../env.ts"
 import {waitfor} from "./utils.ts"
 import { authn } from "../auth/authn.ts"
 import { authz } from "../auth/authz.ts";
+import { Hono, Context } from "npm:hono";
 
 import { STATUS_CODE } from 'https://deno.land/std/http/status.ts';
 
@@ -10,11 +11,11 @@ const headers = new Headers({
 });
 
 
-async function _callInit (servicePath: string, imports, fnEnv, eszip, dir) {
+async function _callInit (servicePath: string, imports: any, fnEnv: any, eszip: string, dir: string) {
 	const myenv = Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[fnEnv])
 	const _myenv =  Object.keys(myenv).map((k) => [k, typeof(myenv[k])==="string"? myenv[k]:JSON.stringify(myenv[k])]);
 	const watch = env.WATCH[fnEnv] || false; 
-	const options = {servicePath: servicePath, memoryLimitMb: 150,
+	const options: any = {servicePath: servicePath, memoryLimitMb: 150,
 		workerTimeoutMs: 1 * 60 * 1000, noModuleCache: false,
 		importMapPath: imports, envVars: _myenv,
 		forceCreate: env._FORCE_CREATE || watch, netAccessDisabled: false, 
@@ -38,12 +39,12 @@ async function _callInit (servicePath: string, imports, fnEnv, eszip, dir) {
 	return;
 }
     
-async function _callWorker (req: any, servicePath: string, imports, fncfg, dir) {
+async function _callWorker (req: any, servicePath: string, imports: any, fncfg: any, dir: string) {
 	const myenv = Object.assign({}, env.SERVICE_ENV["_shared"], env.SERVICE_ENV[fncfg.env], {DB_CREDENTIALS__PRIVATE_KEY: env.DB_CREDENTIALS__PRIVATE_KEY})
 	const _myenv = Object.keys(myenv).map((k) => [k, typeof(myenv[k])==="string"? myenv[k]:JSON.stringify(myenv[k])]);
 	const watch = env.WATCH[fncfg.env] || false; 
 
-	const options = {servicePath: servicePath, memoryLimitMb: 1000,
+	const options: any = {servicePath: servicePath, memoryLimitMb: 1000,
 		workerTimeoutMs: env.WATCH[fncfg.env] ? 1 * 60 * 1000 : 30 * 60 * 1000, noModuleCache: false,
 		importMapPath: imports, envVars: _myenv,
 		forceCreate: env._FORCE_CREATE || watch, netAccessDisabled: false, 
@@ -61,7 +62,7 @@ async function _callWorker (req: any, servicePath: string, imports, fncfg, dir) 
 
 		const signal = controller.signal;
 		return await worker.fetch(req, { signal });
-	} catch (e) {
+	} catch (e: any) {
 		logger.error(e);
 
 		if (e instanceof Deno.errors.WorkerRequestCancelled) {
@@ -79,13 +80,13 @@ async function _callWorker (req: any, servicePath: string, imports, fncfg, dir) 
 	}
 };
 
-function _addFunction(app, url, path, imports, fncfg, dir) {
-	app.all(url+"/*", authn, authz, (c) =>  _callWorker(c.req.raw, `${path}`, imports, fncfg, dir));
+function _addFunction(app: Hono, url: string, path: string, imports: any, fncfg: any, dir: string) {
+	app.all(url+"/*", authn, authz, (c: Context) =>  _callWorker(c.req.raw, `${path}`, imports, fncfg, dir));
 }
 
-function _addService(app, url, service, rmsrc) {
+function _addService(app: Hono, url: string, service: string, rmsrc: boolean) {
 	const service_url = env.SERVICE_ROUTES[service];
-	app.all(url+"/*", authn, authz, async (c) => {
+	app.all(url+"/*", authn, authz, async (c: Context) => {
 		let newHeaders = new Headers(c.req.raw.headers)
 		newHeaders.append('x-source-origin', env.GATEWAY_WO_PROTOCOL_FQDN)
 		const path = rmsrc? c.req.raw.url.replace(/^[^#]*?:\/\/.*?\//,'/').replace(url,'') : c.req.raw.url.replace(/^[^#]*?:\/\/.*?\//,'/');
@@ -95,13 +96,13 @@ function _addService(app, url, service, rmsrc) {
 	});
 }
 
-async function _addInit(path, imports, env, eszip, dir, waitforurl) {
+async function _addInit(path: string, imports: any, env: any, eszip: string, dir: string, waitforurl: string) {
 	if(waitforurl)
 		await waitfor(waitforurl);
 	_callInit(`${path}`, imports, env, eszip, dir);
 }
 
-export async function addFunctionPlugin(app, value, dir) {
+export async function addPlugin(app: Hono, value: any, dir: string) {
     if(value.init) {
         for(const r of value.init) {
             if(r.function) {
@@ -127,7 +128,7 @@ export async function addFunctionPlugin(app, value, dir) {
 			else
 				_name = name
 			if(global.ROLE_SCOPES[_name]) 
-				global.ROLE_SCOPES[_name]= global.ROLE_SCOPES[_name].concat(cfg).filter((v, i, self) => self.lastIndexOf(v) == i);
+				global.ROLE_SCOPES[_name]= global.ROLE_SCOPES[_name].concat(cfg).filter((v: any, i: any, self: any) => self.lastIndexOf(v) == i);
 			else 
             	global.ROLE_SCOPES[_name] = cfg;
         }

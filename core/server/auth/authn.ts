@@ -29,7 +29,7 @@ export async function authn(c: Context, next: Function) {
       return new Response("Unauthorized", { status: 401 });
     }
     let authError = false;
-    await jwtVerify(token, JWKS).catch((err) => {
+    await jwtVerify(token, JWKS).catch((err: any) => {
       logger.error("authenticate: jwt verify failed");
       authError = true;
       logger.error(err);

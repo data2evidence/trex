@@ -1,20 +1,21 @@
 
 import { serveStatic } from "npm:hono/deno";
 import {env, global, logger} from "../env.ts"
+import { Hono, Context } from "npm:hono";
 
-function _addStatic(app, url, path) {
+function _addStatic(app: Hono, url: string, path: string) {
 	logger.log(url + "   " + path);
 	app.use(url+"/*", serveStatic({root: path, 
-		rewriteRequestPath: (path) => {if(path == "/portal/login-callback") return ""; else return path.replace(new RegExp(`^${url}`), '')}, 
-		onNotFound: (path, c) => {
+		rewriteRequestPath: (path: string) => {if(path == "/portal/login-callback") return ""; else return path.replace(new RegExp(`^${url}`), '')}, 
+		onNotFound: (path: string, c: Context) => {
 			logger.log(`${path} is not found, you access ${c.req.path}`);
 		}
 	}));
 }
 
-export function addUIPlugin(app, value, dir) {
+export function addPlugin(app: Hono, value: any, dir: string) {
     if(value.routes)
-        value.routes.forEach(r => {
+        value.routes.forEach((r: any) => {
             _addStatic(app, `${r.source}`, `${dir}${r.target}/`);
     });
     app.use('/portal/login', serveStatic({path: `${dir}/portal.index.html`}));
@@ -22,7 +23,7 @@ export function addUIPlugin(app, value, dir) {
         const tmp = JSON.parse(global.PLUGINS_JSON);
         for(const [k,v] of Object.entries(value.uiplugins)) {
             if(tmp[k]) {
-                tmp[k] = tmp[k].concat(v).filter((v, i, self) => self.map(x => x["route"]).lastIndexOf(v["route"]) == i);
+                tmp[k] = tmp[k].concat(v).filter((v: any, i: any, self: any) => self.map((x: any) => x["route"]).lastIndexOf(v["route"]) == i);
             } else {
                 tmp[k] = v;
             }

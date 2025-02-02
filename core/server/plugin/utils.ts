@@ -1,5 +1,5 @@
 import {logger} from "../env.ts"
-export async function waitfor(url) {
+export async function waitfor(url: string) {
 	let f = false;
 	while(!f) {
 		try {

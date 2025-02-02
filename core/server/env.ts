@@ -17,7 +17,12 @@ export let global = {
     PLUGINS_JSON: "{}"
 }
 
-export let logger = {log: (c) => console.log(`\x1b[32m${c}\x1b[0m`), info: (c) => console.log(`\x1b[32m${c}\x1b[0m`), debug: (c) => console.log(`\x1b[32m${c}\x1b[0m`), error: (c) => console.error(`\x1b[35m${c}\x1b[0m`)};
+export let logger = {
+  log: (c: any) => console.log(`\x1b[32m${c}\x1b[0m`), 
+  info: (c:any) => console.log(`\x1b[32m${c}\x1b[0m`), 
+  debug: (c: any) => console.log(`\x1b[32m${c}\x1b[0m`), 
+  error: (c:any) => console.error(`\x1b[35m${c}\x1b[0m`)
+};
 
 export const publicURLs = [
     '/portalsvc/public-graphql',
@@ -78,7 +83,7 @@ export const env = {
     PLUGINS_PATH: _env.PLUGINS_PATH || "./plugin",
     PLUGINS_API_VERSION: _env.PLUGINS_API_VERSION || 'latest',
     PLUGINS_INIT: _env.PLUGINS_SEED? JSON.parse(_env.PLUGINS_SEED) : [],
-    PLUGINS_SEED_UPDATE: _env.PLUGINS_SEED_UPDATE || false,
+    PLUGINS_SEED_UPDATE: JSON.parse(_env.PLUGINS_SEED_UPDATE) === true || false,
     PLUGINS_PULL_POLICY: _env.PLUGINS_PULL_POLICY || 'IfNotPresent',
 
 }

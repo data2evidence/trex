@@ -13,10 +13,10 @@ if (env.NODE_ENV === 'development') {
 }
 
 axios.interceptors.response.use(
-  response => {
+  (response: any) => {
     return response
   },
-  error => {
+  (error: any) => {
     logger.error(`${error?.config?.method} ${error?.config?.url} ${error}`)
     return error.response
   }

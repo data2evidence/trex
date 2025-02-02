@@ -4,7 +4,7 @@ import { MAIN_WORKER_API, USER_WORKER_API } from "ext:sb_ai/js/ai.js";
 import { SUPABASE_USER_WORKERS } from "ext:sb_user_workers/user_workers.js";
 import { applySupabaseTag } from "ext:sb_core_main_js/js/http.js";
 import { waitUntil } from "ext:sb_core_main_js/js/async_hook.js";
-import { op_add_replication, PluginManager, TrexDB } from "ext:sb_trex/js/trex_lib.js";
+import { op_add_replication, PluginManager, TrexDB, DatabaseManager } from "ext:sb_trex/js/trex_lib.js";
 
 const ops = core.ops;
 const { ObjectDefineProperty } = primordials;
@@ -71,6 +71,7 @@ function installEdgeRuntimeNamespace(kind, terminationRequestTokenRid) {
 				systemMemoryInfo: () => ops.op_system_memory_info(),
 				raiseSegfault: () => ops.op_raise_segfault(),
 				PluginManager: PluginManager,
+				DatabaseManager: DatabaseManager,
 				TrexDB: TrexDB,
 				addReplication: op_add_replication,
 				addDB: op_add_replication,
