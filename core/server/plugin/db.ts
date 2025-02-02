@@ -142,7 +142,6 @@ export class KnexMigration {
     }
   }
 
-
   export async function addPlugin(app: any, value: any, dir: string) {
     const km = new KnexMigration(value.schema, value.migration_path, value.seed_path, value.usejs || false);
     km.initalizeDataSource();

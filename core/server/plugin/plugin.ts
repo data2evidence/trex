@@ -114,7 +114,7 @@ export class Plugins {
 		try {
 			for (const [key, value] of Object.entries(pkg.trex)) {
 				switch(key) {
-					case "db":
+					case "knex":
 						addDBPlugin(app, value, dir);
 						break;
 					case "functions":
