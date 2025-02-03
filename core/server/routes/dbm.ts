@@ -1,9 +1,13 @@
 import {authn} from "../auth/authn.ts"
 import {authz} from "../auth/authz.ts"
+import { Hono, Context } from "npm:hono";
 
-export function addDBManagementRoutes(app) {
+import { DatabaseManager } from '../lib/dbm.ts';
+import { logger } from '../env.ts';
+
+export function addRoutes(app: Hono) {
     
-    app.post('/trex/db/:name', authn, authz, async (c) => {
+    app.post('/trex/db/pub/:name', authn, authz, async (c: Context) => {
         const name = c.req.param('name')+".db";
         const body = await c.req.json();
 
@@ -11,7 +15,31 @@ export function addDBManagementRoutes(app) {
         return c.json({"message": "ok"});
     });
 
-    app.delete('/trex/db/:name', authn, authz, async (c) => {
+    app.delete('/trex/db/:name', authn, authz, async (c: Context) => {
         return c.json({"message": "ok"});
     })
+
+    app.post('/trex/db/', authn, authz, async (c: Context) => {
+        const body = await c.req.json();
+        try {
+            const id = await (await DatabaseManager.get()).setCredentials(body);
+            return c.json({"id": id});
+        } catch (e) {
+            logger.error(e);
+            return c.text(e, 500);
+        }
+    });
+
+    app.get('/trex/db/', authn, authz, async (c: Context) => {
+        const r = await (await DatabaseManager.get()).getCredentials();
+        return c.json(r);
+    });
+
+    app.get('/trex/db/publications/', authn, authz, async (c: Context) => {
+        const r = (await DatabaseManager.get()).getPublications();
+        return c.json(r);
+    });
+
+
+
 }

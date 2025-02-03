@@ -1,6 +1,7 @@
 import { env,global } from '../env.ts'
+import { Hono, Context } from "npm:hono";
 
-export function addPortalRoute(app) {
+export function addRoutes(app: Hono) {
   const GATEWAY_WO_PROTOCOL_FQDN = env.GATEWAY_WO_PROTOCOL_FQDN!
   const GATEWAY_PROTOCOL_FQDN = `https://${GATEWAY_WO_PROTOCOL_FQDN}/`
   const CLIENT_ID = env.LOGTO_CLIENT_ID
@@ -10,11 +11,11 @@ export function addPortalRoute(app) {
   const SCOPE = env.LOGTO_SCOPE
 
 
-  app.get('/portal/plugin.json', (c) => {
+  app.get('/portal/plugin.json', (c: Context) => {
     return c.json(global.PLUGINS_JSON);
   });
 
-  app.get('/portal/env.js', (c) => {
+  app.get('/portal/env.js', (c: Context) => {
     const clientEnv = {
       PUBLIC_URL: '/portal',
       REACT_APP_LOCALE: env.APP_LOCALE,

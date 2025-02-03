@@ -9,19 +9,57 @@ const {
 } = ops;
 
 
-class DatabaseManager {
 
+class DatabaseManager {
+	static #dbm;
+	#credentials = [];
+	#publications = {};
+
+	#contructor() {}
+
+	static getDatabaseManager() {
+		if(!DatabaseManager.#dbm) {
+			DatabaseManager.#dbm = new DatabaseManager();
+		}
+		return DatabaseManager.#dbm;
+	}
+
+	setCredentials(credentials) {
+		this.#credentials = credentials;
+		this.#updatePublications();
+	}
+
+	#updatePublications() {
+		for(const c of this.#credentials) {
+			if(c.publications) {
+				const adminCredentials = c.credentials.filter(c => c.userScope === 'Admin')[0];
+				for(const p of c.publications) {
+					const key = `${c.id}_${p.publication}_${p.slot}`
+					if(!(key in this.#publications)) {
+						op_add_replication(p.publication, p.slot, key, c.host, c.port, c.name, adminCredentials.username, adminCredentials.password);
+						this.#publications[key] = true;
+					}
+				}
+			} 
+		}
+	}
+
+	getPublications() {
+		return this.#publications;
+	}
+
+	getCredentials() {
+		return this.#credentials;
+	}
 }
 
 
+
 class TrexDB {
-	database;
+	#database;
 	constructor(database) {
-		this.database = database
+		this.#database = database
 	}
-
-
-
 
 	execute(sql, params) {
 
@@ -41,7 +79,7 @@ class TrexDB {
 					return {"Number": v};
 				});
 				console.log(nparams);
-				resolve(JSON.parse(op_execute_query(this.database, sql, nparams)));
+				resolve(JSON.parse(op_execute_query(this.#database, sql, nparams)));
 			} catch(e) {
 				reject(e);
 			}
@@ -50,13 +88,13 @@ class TrexDB {
 }
 
 class PluginManager {
-	path;
+	#path;
 	constructor(path) {
-		this.path = path;
+		this.#path = path;
 	}
 
 	install(pkg) {
-		op_install_plugin(pkg, this.path);
+		op_install_plugin(pkg, this.#path);
 	}
 }
 
