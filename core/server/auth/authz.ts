@@ -17,6 +17,7 @@ export const ROLES = {
   TENANT_VIEWER: 'TENANT_VIEWER',
   RESEARCHER: 'RESEARCHER',
   STUDY_RESEARCHER: 'RESEARCHER',
+  STUDY_WRITE_DQD_RESEARCHER: 'STUDY_WRITE_DQD_RESEARCHER',
   VALIDATE_TOKEN_ROLE: 'VALIDATE_TOKEN',
   ADMIN_DATA_READER_ROLE: 'ADMIN_DATA_READER',
   BI_DATA_READER_ROLE: 'BI_DATA_READER',
@@ -122,7 +123,8 @@ const buildUserFromToken = (token: IAppTokenPayload, ROLE_SCOPES): IUser => {
     if (userMgmtGroups.alp_role_tenant_viewer?.length > 0) {
       roles.push(ROLES.TENANT_VIEWER)
     }
-    if (userMgmtGroups.alp_role_study_researcher?.length > 0) {
+    if (userMgmtGroups.alp_role_study_researcher?.length > 0 || 
+        userMgmtGroups.alp_role_study_write_dqd_researcher?.length > 0) {
       //roles.push(ROLES.RESEARCHER)
       for (const datasetId of userMgmtGroups.alp_role_study_researcher) {
         //if (url.includes(datasetId) || url.includes('/system-portal/notebook') || url.includes('/terminology')) {
@@ -152,6 +154,12 @@ const buildUserFromToken = (token: IAppTokenPayload, ROLE_SCOPES): IUser => {
 
   if (userMgmtGroups.alp_role_study_researcher?.length > 0) {
     const roleScopes = roleScopesMap.get(ROLES.STUDY_RESEARCHER)
+    if (roleScopes) {
+      studyScopes.push(...roleScopes)
+    }
+  }
+  if (userMgmtGroups.alp_role_study_write_dqd_researcher?.length > 0) {
+    const roleScopes = roleScopesMap.get(ROLES.STUDY_WRITE_DQD_RESEARCHER)
     if (roleScopes) {
       studyScopes.push(...roleScopes)
     }
