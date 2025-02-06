@@ -76,7 +76,8 @@ class SeedSource {
     }
   
     getMigration(migration: any)  {
-          return import(`./${this.path}/${migration}`);
+          return import(this.path+`${migration}`);
+          //return import(`./${this.path}/${migration}`);
     }
   }
 
