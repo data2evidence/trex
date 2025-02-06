@@ -64,7 +64,6 @@ class SeedSource {
       let res = []
       for await (const f of files) {
         res.push(f.name)
-
       }
 
       return Promise.resolve(res.sort());

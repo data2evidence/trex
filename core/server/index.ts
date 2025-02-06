@@ -32,5 +32,9 @@ export async function initTrex() {
 }
 
 logger.log('🦖 TREX DB initializing 🦖');
+<<<<<<< HEAD
 await new KnexMigration('trex', "./db/migrations/", null).initalizeDataSource();
+=======
+await new KnexMigration('trex', "../db/migrations", null).initalizeDataSource();
+>>>>>>> develop
 await initTrex();
