@@ -1,5 +1,7 @@
 ## Trex 🦖
 
+[![Docker Build and Push to Azure CR](https://github.com/data2evidence/trex/actions/workflows/docker-build-push.yml/badge.svg)](https://github.com/data2evidence/trex/actions/workflows/docker-build-push.yml) &nbsp;&nbsp; [![NPM build package](https://github.com/data2evidence/trex/actions/workflows/npm-ci.yml/badge.svg)](https://github.com/data2evidence/trex/actions/workflows/npm-ci.yml)
+
 ### Plugin Installation
 Endpoints:
 - `GET trex/plugins` list installed and available plugins

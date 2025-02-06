@@ -4,11 +4,16 @@
   "description": "",
   "main": "lib/trex.js",
   "scripts": {
-    "start": "mkdir -p ./cert ; echo \"$TLS__INTERNAL__CRT\" > ./cert/cert.pem & echo \"$TLS__INTERNAL__KEY\" > ./cert/key.pem & ./trex start --tls 33000 -p 33001 --key ./cert/key.pem --cert ./cert/cert.pem --main-service ./core/server/index.eszip --event-worker ./core/event/index.eszip",
+    "start": "mkdir -p ./cert ; echo \"$TLS__INTERNAL__CRT\" > ./cert/cert.pem & echo \"$TLS__INTERNAL__KEY\" > ./cert/key.pem & ./trex start --tls 33000 -p 33001 --key ./cert/key.pem --cert ./cert/cert.pem --sql 5432 --main-service ./core/server/index.eszip --event-worker ./core/event/index.eszip",
     "start2": "deno run --allow-net --allow-env --allow-read --allow-sys core/server/index.ts",
-    "startdev": "mkdir -p ./cert ; echo \"$TLS__INTERNAL__CRT\" > ./cert/cert.pem & echo \"$TLS__INTERNAL__KEY\" > ./cert/key.pem & ./trex start --tls 33000 -p 33001 --key ./cert/key.pem --cert ./cert/cert.pem --main-service ./core/server/index.eszip --event-worker ./core/event/index.eszip --inspect=0.0.0.0:9229",
+    "startdev": "mkdir -p ./cert ; echo \"$TLS__INTERNAL__CRT\" > ./cert/cert.pem & echo \"$TLS__INTERNAL__KEY\" > ./cert/key.pem & ./trex start --tls 33000 -p 33001 --key ./cert/key.pem --cert ./cert/cert.pem --sql 5432 --main-service ./core/server/index.eszip --event-worker ./core/event/index.eszip --log-source --inspect=0.0.0.0:9229",
     "health": "bun -e \"await fetch('http://localhost:33001/_internal/health');\"",
-    "watch": "mkdir -p ./cert ; echo \"$TLS__INTERNAL__CRT\" > ./cert/cert.pem & echo \"$TLS__INTERNAL__KEY\" > ./cert/key.pem & npx nodemon --watch core -e ts --exec ./trex start --tls 33000 -p 33001 --key ./cert/key.pem --cert ./cert/cert.pem --main-service ./core/server --event-worker ./core/event --inspect=0.0.0.0:9229"
+    "watch": "mkdir -p ./cert ; echo \"$TLS__INTERNAL__CRT\" > ./cert/cert.pem & echo \"$TLS__INTERNAL__KEY\" > ./cert/key.pem & npx nodemon --watch core -e ts --exec ./trex start --tls 33000 -p 33001 --key ./cert/key.pem --cert ./cert/cert.pem --sql 5432 --main-service ./core/server --event-worker ./core/event --log-source --inspect=0.0.0.0:9229",
+    "start:trex": "ENV_TYPE=local docker compose --file ../../docker-compose.yml --file ../../docker-compose-atlas.yml --file ../../docker-compose-local.yml --file docker-compose.yml --env-file ../../.env.local up",
+    "build:trex": "ENV_TYPE=local docker compose --file ../../docker-compose.yml --file ../../docker-compose-atlas.yml --file ../../docker-compose-local.yml --file docker-compose.yml --env-file ../../.env.local build trex",
+    "watchtest": "RUST_LOG=info RUST_BACKTRACE=full npx nodemon --watch test -e ts --exec ./target/debug/trex start --main-service ./test/main --event-worker ./test/event-manager --sql 25432",
+    "test": "bash ./scripts/trextest.sh",
+    "testdb": "docker compose -f docker-compose-test.yml up"
   },
   "bin": {
     "tbuild": "./scripts/build_plugin.sh",

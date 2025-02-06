@@ -8,6 +8,7 @@ export $(grep -v '^#' $SCRIPTPATH/../.env | xargs)
 
 # --features cli/tracing
 cargo build --features cli/tracing && \
-RUST_BACKTRACE=full ./target/debug/edge-runtime "$@" start \
+RUST_BACKTRACE=full ./target/debug/trex "$@" start \
     --main-service ./examples/main \
-    --event-worker ./examples/event-manager
+    --event-worker ./examples/event-manager \
+    --sql 5432

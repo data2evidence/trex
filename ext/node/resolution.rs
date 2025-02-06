@@ -663,7 +663,7 @@ impl NodeResolver {
                     Err(_) => {
                         let export_target = if pattern {
                             pattern_re
-                                .replace(target, |_caps: &regex::Captures| subpath)
+                                .replace(target, |_caps: &lazy_regex::Captures| subpath)
                                 .to_string()
                         } else {
                             format!("{target}{subpath}")
@@ -756,7 +756,7 @@ impl NodeResolver {
         if pattern {
             let resolved_path_str = resolved_path.to_string_lossy();
             let replaced =
-                pattern_re.replace(&resolved_path_str, |_caps: &regex::Captures| subpath);
+                pattern_re.replace(&resolved_path_str, |_caps: &lazy_regex::Captures| subpath);
             return Ok(to_file_specifier(&PathBuf::from(replaced.to_string())));
         }
         Ok(to_file_specifier(&resolved_path.join(subpath).clean()))

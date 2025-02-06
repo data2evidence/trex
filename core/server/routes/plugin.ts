@@ -4,8 +4,9 @@ import {Plugins} from "../plugin/plugin.ts"
 import {env, logger} from "../env.ts"
 import { HTTPException } from 'npm:hono/http-exception'
 import * as semver from 'npm:semver'
+import { Hono, Context } from "npm:hono";
 
-function _checkSemver(version, sver) {
+function _checkSemver(version: string, sver: string) {
     if(sver === 'compatible')
         sver = env.PLUGINS_API_VERSION
     if(sver && sver != "latest" && sver != 'all') {
@@ -14,12 +15,12 @@ function _checkSemver(version, sver) {
     return true
 }
 
-export function addPluginRoutes(app) {
-    app.get('/trex/plugins', authn, authz, async (c) => {
+export function addRoutes(app: Hono) {
+    app.get('/trex/plugins', authn, authz, async (c: Context) => {
         const p = await Plugins.get();
         const q = c.req.query('version') || 'compatible'
 
-        let instplugins = (await p.getPlugins())["rows"];
+        const instplugins = (await p.getPlugins())["rows"];
         if(q === 'none')
             return  c.json(instplugins);
 
@@ -27,20 +28,20 @@ export function addPluginRoutes(app) {
         const tmp = await Promise.all((await pkgs.json()).map(async e => {
             const vres = await fetch(`https://api.github.com/orgs/${env.GH_ORG}/packages/npm/${e.name}/versions`, {headers: { "Authorization": `Bearer ${env.GH_TOKEN}`}})
             const versions = await vres.json();
-            const version = versions.reduce((m, c) => { return c["name"] > m && _checkSemver(c["name"], q) ? c["name"] : m }, "");
-            const installed_plugin = instplugins.filter(p => p.name === e.name)
+            const version = versions.reduce((m: any, c: any) => { return c["name"] > m && _checkSemver(c["name"], q) ? c["name"] : m }, "");
+            const installed_plugin = instplugins.filter((p: any) => p.name === e.name)
             const r = {name: e.name, registry_version: version, version: installed_plugin[0]?.version, url: installed_plugin[0]?.url, installed: installed_plugin[0] ? true: false}
             return r
         }))
-        const not_listed_plugins = instplugins.filter(e =>  tmp.filter(p => p.name === e.name).length<1).map(p => {p["installed"]= true; return p})
+        const not_listed_plugins = instplugins.filter((e: any) =>  tmp.filter(p => p.name === e.name).length<1).map((p: any) => {p["installed"]= true; return p})
         return c.json(tmp.concat(not_listed_plugins))
     });
 
-    app.patch('/trex/plugins', authn, authz, async (c) => {
+    app.patch('/trex/plugins', authn, authz, async (c: Context) => {
         Plugins.initPlugins(app);
     })
 
-    app.post('/trex/plugins/:name', authn, authz, async (c) => {
+    app.post('/trex/plugins/:name', authn, authz, async (c: Context) => {
         const p = await Plugins.get();
         let name = c.req.param('name');
         if(await p.isInstalled(name))
@@ -55,9 +56,9 @@ export function addPluginRoutes(app) {
         return c.json(gp);
     });
 
-    app.put('/trex/plugins/:name', authn, authz, async (c) => {
+    app.put('/trex/plugins/:name', authn, authz, async (c: Context) => {
         const p = await Plugins.get();
-        let name = c.req.param('name');
+        const name = c.req.param('name');
         try {
             await p.addPluginPackage(app, name, true)
         } catch(e) {
@@ -68,7 +69,7 @@ export function addPluginRoutes(app) {
         return c.json(gp);
     });
 
-    app.delete('/trex/plugins/:name', authn, authz, async (c) => {
+    app.delete('/trex/plugins/:name', authn, authz, async (c: Context) => {
         const p = await Plugins.get();
         const name = c.req.param('name');
         try {

@@ -35,7 +35,8 @@ jobs:
 
   cargo-test:
     name: "cargo test"
-    runs-on: ubuntu-latest
+    runs-on:
+      group: trex
     steps:
       - name: Remove unwanted software
         run: |

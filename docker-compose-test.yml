@@ -1,0 +1,20 @@
+volumes:
+  trex-atlasdb:
+    name: trex-atlasdb
+
+services:
+  test-broadsea-atlasdb:
+    image: ohdsi/broadsea-atlasdb:2.0.0
+    container_name: test-broadsea-atlasdb
+    mem_limit: "2G"
+    ports:
+      - 65432:5432
+    environment:
+      - POSTGRES_PASSWORD=mypass
+    volumes:
+      - trex-atlasdb:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

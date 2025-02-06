@@ -479,7 +479,7 @@ where
             .unwrap_or_default();
 
         if is_some_entry_point {
-            main_module_url = Url::parse(&maybe_entrypoint.unwrap())?;
+            main_module_url = Url::parse(&maybe_entrypoint.clone().unwrap())?;
         }
 
         let mut net_access_disabled = false;
@@ -620,9 +620,18 @@ where
             .and_then(serde_json::Value::as_bool)
             .unwrap_or_default();
 
+        let static_root_path = if is_some_entry_point {
+            match Url::parse(&maybe_entrypoint.clone().unwrap())?.to_file_path() {
+                Ok(path) => path.parent().unwrap().to_path_buf(),
+                Err(_) => base_dir_path,
+            }
+        } else {
+            base_dir_path
+        };
+
         let rt_provider = create_module_loader_for_standalone_from_eszip_kind(
             eszip,
-            base_dir_path.clone(),
+            static_root_path.clone(),
             maybe_import_map,
             import_map_path,
             has_inspector || need_source_map,
@@ -660,7 +669,7 @@ where
             if is_user_worker {
                 Arc::new(StaticFs::new(
                     static_files,
-                    base_dir_path,
+                    static_root_path,
                     vfs_path,
                     vfs,
                     npm_snapshot,
@@ -728,6 +737,7 @@ where
             sb_env_op::init_ops(),
             sb_ai::init_ops(),
             sb_os::sb_os::init_ops(),
+            trex_core::sb_trex::init_ops(),
             sb_user_workers::init_ops(),
             sb_user_event_worker::init_ops(),
             sb_events_js_interceptors::init_ops(),
@@ -1531,6 +1541,7 @@ pub enum MaybeDenoRuntime<'l, RuntimeContext> {
     IsolateWithCancellationToken(IsolateWithCancellationToken<'l>),
 }
 
+#[allow(clippy::needless_lifetimes)]
 impl<'l, RuntimeContext> MaybeDenoRuntime<'l, RuntimeContext>
 where
     RuntimeContext: GetRuntimeContext,
@@ -1583,6 +1594,7 @@ where
         }
     }
 
+    #[allow(elided_named_lifetimes)]
     fn dispatch_event_with_callback<T, U, V, R>(
         &mut self,
         select_dispatch_fn: T,

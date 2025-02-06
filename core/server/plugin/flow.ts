@@ -3,7 +3,7 @@
 import {env, logger} from "../env.ts"
 import {waitfor} from "./utils.ts"
 
-export async function addFlowPlugin(value) {
+export async function addPlugin(value: any) {
 	try {
 		if(!env.PREFECT_API_URL) {
 			logger.error("Prefect URL not defined: skipping flow plugins");
@@ -14,7 +14,7 @@ export async function addFlowPlugin(value) {
 			await new Promise(resolve => setTimeout(resolve, 3000));
 		}
 		if(value.flows)
-			value.flows.forEach(async f => {
+			value.flows.forEach(async (f: any) => {
 				const res = await fetch(`${env.PREFECT_API_URL}/flows/`, {
 					method: "POST",
 					headers: {
@@ -30,7 +30,7 @@ export async function addFlowPlugin(value) {
 
 				} else {
 					const jres = await res.json();
-					const body = {
+					const body: any = {
 						name: f.name,
 						flow_id: jres.id,
 						work_pool_name: env.PREFECT_POOL,
@@ -39,7 +39,7 @@ export async function addFlowPlugin(value) {
 						enforce_parameter_schema: false,
 						job_variables: {
 							image: f.image,
-							image_pull_policy: f.image_pull_policy,
+							image_pull_policy: env.PLUGINS_PULL_POLICY,
 							volumes: env.PREFECT_DOCKER_VOLUMES,
 							networks: [env.PREFECT_DOCKER_NETWORK]
 						},
