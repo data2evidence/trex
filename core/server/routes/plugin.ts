@@ -24,16 +24,17 @@ export function addRoutes(app: Hono) {
         if(q === 'none')
             return  c.json(instplugins);
 
-        const pkgs =  await fetch(`https://api.github.com/orgs/${env.GH_ORG}/packages?package_type=npm`, {headers: { "Authorization": `Bearer ${env.GH_TOKEN}`}})
-        const tmp = await Promise.all((await pkgs.json()).map(async e => {
-            const vres = await fetch(`https://api.github.com/orgs/${env.GH_ORG}/packages/npm/${e.name}/versions`, {headers: { "Authorization": `Bearer ${env.GH_TOKEN}`}})
-            const versions = await vres.json();
-            const version = versions.reduce((m: any, c: any) => { return c["name"] > m && _checkSemver(c["name"], q) ? c["name"] : m }, "");
-            const installed_plugin = instplugins.filter((p: any) => p.name === e.name)
-            const r = {name: e.name, registry_version: version, version: installed_plugin[0]?.version, url: installed_plugin[0]?.url, installed: installed_plugin[0] ? true: false}
-            return r
-        }))
-        const not_listed_plugins = instplugins.filter((e: any) =>  tmp.filter(p => p.name === e.name).length<1).map((p: any) => {p["installed"]= true; return p})
+        const pkgs =  await fetch(`https://feeds.dev.azure.com/data2evidence/d2e/_apis/packaging/Feeds/d2e/packages?api-version=7.1`)
+        const pkgs_json = await pkgs.json();
+        const tmp = pkgs_json.value.map((pkg:any) => {
+            const pkgname = pkg.name.replace(`@${env.GH_ORG}/`, ""); 
+            const version = pkg.versions.reduce((m: any, c: any) => { return c["version"] > m && _checkSemver(c["version"], q) ? c["version"] : m }, "");
+            const installed_plugin = instplugins.filter((p: any) => p.name === pkgname)
+            const r = {name: pkgname, registry_version: version, version: installed_plugin[0]?.version, url: installed_plugin[0]?.url, installed: installed_plugin[0] ? true: false}
+            return r;
+
+        });
+        const not_listed_plugins = instplugins.filter((e: any) =>  tmp.filter((p :any) => p.name === e.name).length<1).map((p: any) => {p["installed"]= true; return p})
         return c.json(tmp.concat(not_listed_plugins))
     });
 
