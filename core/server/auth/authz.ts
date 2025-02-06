@@ -123,8 +123,10 @@ const buildUserFromToken = (token: IAppTokenPayload, ROLE_SCOPES): IUser => {
     if (userMgmtGroups.alp_role_tenant_viewer?.length > 0) {
       roles.push(ROLES.TENANT_VIEWER)
     }
-    if (userMgmtGroups.alp_role_study_researcher?.length > 0 || 
-        userMgmtGroups.alp_role_study_write_dqd_researcher?.length > 0) {
+    if (userMgmtGroups.alp_role_study_write_dqd_researcher?.length > 0) {
+      roles.push(ROLES.STUDY_WRITE_DQD_RESEARCHER)
+    }
+    if (userMgmtGroups.alp_role_study_researcher?.length > 0) {
       //roles.push(ROLES.RESEARCHER)
       for (const datasetId of userMgmtGroups.alp_role_study_researcher) {
         //if (url.includes(datasetId) || url.includes('/system-portal/notebook') || url.includes('/terminology')) {
@@ -154,12 +156,6 @@ const buildUserFromToken = (token: IAppTokenPayload, ROLE_SCOPES): IUser => {
 
   if (userMgmtGroups.alp_role_study_researcher?.length > 0) {
     const roleScopes = roleScopesMap.get(ROLES.STUDY_RESEARCHER)
-    if (roleScopes) {
-      studyScopes.push(...roleScopes)
-    }
-  }
-  if (userMgmtGroups.alp_role_study_write_dqd_researcher?.length > 0) {
-    const roleScopes = roleScopesMap.get(ROLES.STUDY_WRITE_DQD_RESEARCHER)
     if (roleScopes) {
       studyScopes.push(...roleScopes)
     }
@@ -291,40 +287,41 @@ export async function authz(c, next) {
       }*/
 
       const { scopes } = match
-      // the allowed scopes for a url should be found in the user's assigned scopes
-      if (scopes.some(i => mriUserObj.mriScopes.includes(i))) {
+      // the allowed scopes for a url should be found in the user's assigned scopes      
+      if(hasRequiredScopes(scopes, mriUserObj.mriScopes.concat(mriUserObj.studyScopes))) {
         logger.info(`AUTHORIZED ACCESS: user ${mriUserObj.userId}, url ${originalUrl}`)
         if (isDev) {
           //logger.info(`🚀 inside au, req.headers: ${JSON.stringify(c.req.headers)}`)
         }
-        return next()
-      } else if(scopes.some(i => mriUserObj.studyScopes.includes(i))) {
 
-        let datasetId: string | null = null;
-        const datasetIdKey = match["datasetId"] ?? "datasetId"
-        // Look for datasetId in query param
-        datasetId = c.req.query(datasetIdKey);
+        if(requireDatasetId(mriUserObj.studyScopes)) {
+          let datasetId: string | null = null;
+          const datasetIdKey = match["datasetId"] ?? "datasetId"
+          // Look for datasetId in query param
+          datasetId = c.req.query(datasetIdKey);
 
-        // Look for datasetId in body if not found in query parameter
-        if (!datasetId) {
-          datasetId = await _lookForDatasetIdInBody(c, datasetIdKey)
-        }
-
-        if(datasetId) {
-          if(mriUserObj.alpRoleMap.STUDY_RESEARCHER_ROLE.indexOf(datasetId) > -1) {
-            logger.info(`AUTHORIZED STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}`)
-            return next()
-          } else {
-            logger.error(`datasetId check: No Access to datasetId ${datasetId}`)
+          // Look for datasetId in body if not found in query parameter
+          if (!datasetId) {
+            datasetId = await _lookForDatasetIdInBody(c, datasetIdKey)
           }
-        } else {
-          logger.error(`\x1b[0m\x1b[41m>>> NO datasetId defined in scope @ ${c.req.method} ${c.req.path}<<<\x1b[0m`)
-          //logger.info(`\x1b[0m\x1b[41mTMP OVERWRITE STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}\x1b[0m`)
-          //return next()
+
+          if(datasetId) {
+            if(mriUserObj.alpRoleMap.STUDY_RESEARCHER_ROLE.indexOf(datasetId) > -1) {
+              logger.info(`AUTHORIZED STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}`)
+              return next()
+            } else {
+              logger.error(`datasetId check: No Access to datasetId ${datasetId}`)
+            }
+          } else {
+            logger.error(`\x1b[0m\x1b[41m>>> NO datasetId defined in scope @ ${c.req.method} ${c.req.path}<<<\x1b[0m`)
+            //logger.info(`\x1b[0m\x1b[41mTMP OVERWRITE STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}\x1b[0m`)
+            //return next()
+          }
         }
 
-
+        return next()
       }
+
       logger.info(`inside authz: Forbidden, token does not have required scope`)
       logger.debug(`inside authz: Forbidden url: ${originalUrl} scope: ${JSON.stringify(match)} user: ${JSON.stringify(mriUserObj)}`)
       throw new HTTPException(403, { res: new Response('Forbidden', {status: 403 })})
@@ -335,26 +332,36 @@ export async function authz(c, next) {
       })
     }
   }
+}
+
+function hasRequiredScopes(reqScopes: string[], userScopes: string[]) {
+  return reqScopes.every(scope => userScopes.includes(scope))
+}
+
+function requireDatasetId(studyScopes: string[]): boolean {
+  // TODO: following condition may change, what is the base condition to identify the request as dataset specific
+  // One way is to add a flag to the endpoint definition in package.json
+  return studyScopes.length > 0
+}
+
+const _lookForDatasetIdInBody = async (
+  c,
+  datasetIdKey: string
+): Promise<string | null> => {
+  let datasetId = null;
+
+  // Return null if body is empty
+  if (!c.req.raw.body) {
+    return null;
   }
 
-  const _lookForDatasetIdInBody = async (
-    c,
-    datasetIdKey: string
-  ): Promise<string | null> => {
-    let datasetId = null;
-
-    // Return null if body is empty
-    if (!c.req.raw.body) {
-      return null;
+  const contentType = c.req.header('Content-Type')
+  if (contentType === 'application/json') {
+    // Clone req is required to not affect request body for downstream services 
+    const body = await c.req.raw.clone().json();
+    if (body) {
+      datasetId = body[datasetIdKey];
     }
-
-    const contentType = c.req.header('Content-Type')
-    if (contentType === 'application/json') {
-      // Clone req is required to not affect request body for downstream services 
-      const body = await c.req.raw.clone().json();
-      if (body) {
-        datasetId = body[datasetIdKey];
-      }
-    }
-    return datasetId;
-  };
+  }
+  return datasetId;
+};
