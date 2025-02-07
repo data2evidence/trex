@@ -1,2 +1,2 @@
 [install.scopes]
-"@data2evidence" = { token = "$GH_TOKEN", url = "https://npm.pkg.github.com/" }
+"@data2evidence" = { url = "https://pkgs.dev.azure.com/data2evidence/d2e/_packaging/d2e/npm/registry/" }
