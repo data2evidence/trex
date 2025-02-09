@@ -2,6 +2,8 @@ pub mod clients;
 pub mod conversions;
 pub mod pipeline;
 pub mod sql;
+use std::process;
+
 use deno_core::error::AnyError;
 use deno_core::op2;
 use duckdb::arrow::record_batch::RecordBatch;
@@ -28,6 +30,12 @@ use crate::pipeline::{
 
 static TREX_DB: LazyLock<Arc<Mutex<Connection>>> =
     LazyLock::new(|| Arc::new(Mutex::new(Connection::open_in_memory().unwrap())));
+
+static DB_CREDENTIALS: LazyLock<Arc<Mutex<String>>> = LazyLock::new(|| {
+    Arc::new(Mutex::new(String::from(
+        "{\"credentials\":[], \"publications\":{}}",
+    )))
+});
 
 pub async fn start_sql_server(ip: &str, port: u16, auth_type: AuthType) {
     let factory = Arc::new(TrexDuckDBFactory {
@@ -183,21 +191,29 @@ fn op_add_replication(
     });
 }
 
+#[op2]
+#[string]
+fn op_get_dbc() -> String {
+    return (*(*DB_CREDENTIALS)).lock().unwrap().clone();
+}
+
+#[op2(fast)]
+fn op_set_dbc(#[string] dbc: String) {
+    *(*(*DB_CREDENTIALS)).lock().unwrap() = dbc;
+}
+
 #[op2(fast)]
 fn op_install_plugin(#[string] name: String, #[string] dir: String) {
     Command::new("npx")
-        .args([
-            "bun",
-            "install",
-            "-f",
-            "--silent",
-            "--no-cache",
-            "--no-save",
-            &name,
-        ])
+        .args(["bun", "install", "-f", "--no-cache", "--no-save", &name])
         .current_dir(dir)
         .status()
         .expect("failed to execute process");
+}
+
+#[op2(fast)]
+fn op_exit(code: i32) {
+    process::exit(code);
 }
 
 #[derive(Serialize, Deserialize)]
@@ -244,10 +260,47 @@ fn op_execute_query(
         .inspect_err(|e| warn!("{e}"));
     let mut stmt = conn.prepare(&sql)?;
 
-    //let n = stmt.parameter_count();
+    /*let n = stmt.parameter_count();
+    let mut tparams: Vec<TrexType> = Vec::new();
+    for i in 0..n {
+        let t: ffi::duckdb_type = stmt.parameter_type(i.try_into().unwrap());
+        print!("TYPE: {t}");
+        match t {
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_BIGINT |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_HUGEINT |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_INTEGER |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_SMALLINT |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_TINYINT => {
+                tparams.push(TrexType::Integer(params.get(i).unwrap().parse::<i64>().unwrap()));
+            }
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_UBIGINT |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_UHUGEINT |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_UINTEGER |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_USMALLINT |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_UTINYINT |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_VARINT => {
+                tparams.push(TrexType::Integer(params.get(i).unwrap().parse::<i64>().unwrap()));
+            }
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_DECIMAL |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_DOUBLE |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_FLOAT => {
+                tparams.push(TrexType::Number(params.get(i).unwrap().parse::<f64>().unwrap()));
+            }
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_TIMESTAMP |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_TIMESTAMP_MS |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_TIMESTAMP_NS |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_TIMESTAMP_S |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_TIMESTAMP_TZ  => {
+                tparams.push(TrexType::DateTime(params.get(i).unwrap().parse::<i64>().unwrap()));
+            }
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_ANY |
+            ffi::DUCKDB_TYPE_DUCKDB_TYPE_VARCHAR |
+            _ => {
+                tparams.push(TrexType::String((params.get(i).unwrap()).clone()));
+            }
+        }
 
-    //let _x: ffi::duckdb_type;
-    //ffi::duckdb_param_type(stmt.into_raw(), i);
+    }*/
 
     let rows: Vec<RecordBatch> = stmt.query_arrow(params_from_iter(params.iter()))?.collect();
     let buffer = Vec::new();
@@ -258,13 +311,24 @@ fn op_execute_query(
     writer.finish().unwrap();
     let buffer = writer.into_inner();
     let s = String::from_utf8(buffer).unwrap();
-    warn!(s);
+    //warn!(s);
     Ok(s)
 }
 
 deno_core::extension!(
     sb_trex,
-    ops = [op_add_replication, op_install_plugin, op_execute_query,],
+    ops = [
+        op_add_replication,
+        op_install_plugin,
+        op_execute_query,
+        op_exit,
+        op_get_dbc,
+        op_set_dbc
+    ],
     esm_entry_point = "ext:sb_trex/js/trex_lib.js",
-    esm = ["js/trex_lib.js",]
+    esm = [
+        "js/trex_lib.js",
+        "js/pgconnection.js",
+        "js/hdbconnection.js"
+    ]
 );

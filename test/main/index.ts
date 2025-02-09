@@ -30,7 +30,7 @@ addEventListener('beforeunload', () => {
 
 const createWorker = async (servicePath) => {
     const memoryLimitMb = 150;
-    const workerTimeoutMs = 1000;
+    const workerTimeoutMs = 10000;
     const noModuleCache = false;
 
     // you can provide an import map inline
@@ -77,8 +77,7 @@ const createWorker = async (servicePath) => {
 };
 
 
-
-Deno.serve(async (req: Request) => {
+async function userWorker(req: Request) {
     const headers = new Headers({
         'Content-Type': 'application/json',
     });
@@ -201,14 +200,22 @@ Deno.serve(async (req: Request) => {
     };
 
     return callWorker();
-});
+}
+
+
+//Deno.serve(userWorker);
+
+test();
 
 const baseDir ="./test/_test/";
 for await (const dirEntry of Deno.readDir(baseDir)) {
     const dir = baseDir+dirEntry.name;
-    console.log(`TEST USERWORKER: ${dir}`);
-    createWorker(dir);
+    setTimeout(()=> {
+        console.log(`TEST USERWORKER: ${dir}`);
+        createWorker(dir);
+    }, 5000);
+
 
 }
+setTimeout(() => { Trex.exit(0);}, 1000000);
 
-test();

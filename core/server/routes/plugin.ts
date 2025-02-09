@@ -24,13 +24,13 @@ export function addRoutes(app: Hono) {
         if(q === 'none')
             return  c.json(instplugins);
 
-        const pkgs =  await fetch(`https://feeds.dev.azure.com/data2evidence/d2e/_apis/packaging/Feeds/d2e/packages?api-version=7.1`)
+        const pkgs =  await fetch(`https://feeds.dev.azure.com/data2evidence/d2e/_apis/packaging/Feeds/d2e/packages?api-version=7.1&includeDescription=true`)
         const pkgs_json = await pkgs.json();
         const tmp = pkgs_json.value.map((pkg:any) => {
             const pkgname = pkg.name.replace(`@${env.GH_ORG}/`, ""); 
-            const version = pkg.versions.reduce((m: any, c: any) => { return c["version"] > m && _checkSemver(c["version"], q) ? c["version"] : m }, "");
+            const version = pkg.versions.reduce((m: any, c: any) => { return c["version"] > m["version"] && _checkSemver(c["version"], q) ? c : m }, {version:"", packageDescription:""});
             const installed_plugin = instplugins.filter((p: any) => p.name === pkgname)
-            const r = {name: pkgname, registry_version: version, version: installed_plugin[0]?.version, url: installed_plugin[0]?.url, installed: installed_plugin[0] ? true: false}
+            const r = {name: pkgname, description: version.packageDescription, registry_version: version.version, version: installed_plugin[0]?.version, url: installed_plugin[0]?.url, installed: installed_plugin[0] ? true: false}
             return r;
 
         });
