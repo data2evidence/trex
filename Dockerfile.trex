@@ -41,7 +41,7 @@ RUN /usr/src/trex bundle --entrypoint /usr/src/core/server/index.ts --output /us
 RUN /usr/src/trex bundle --entrypoint /usr/src/core/event/index.ts --output /usr/src/core/event/index.eszip 
 
 # Allows usage of npx
-RUN ln -s /usr/src/node_modules/@oven/bun-linux-x64-baseline/bin/bun /usr/src/node_modules/.bin/bun
+RUN ln -s /usr/src/node_modules/@oven/bun-linux-x64-baseline/bin/bun /usr/src/node_modules/.bin/bun || true
 
 CMD ["npm", "run", "start"]
 EXPOSE 33000
