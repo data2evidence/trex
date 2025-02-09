@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile.trex
       target: development
     pull_policy: never
+    platform: linux/arm64/v8
     command: npm run watch
     ports:
       - 33000:33000
