@@ -73,6 +73,7 @@ export class HanaConnection  {
     };
 
     #callUserWorker(params, cb) {
+      
         this.#callWorker(params, cb);
     }
 

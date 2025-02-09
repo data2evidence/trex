@@ -71,11 +71,6 @@ export class DatabaseManager {
 	}
 
 	getFirstPublication(db_id) {
-		console.log("ASDDSADSA")
-
-		console.log(this.getCredentials())
-		console.log("ASDDSADSA")
-
 		const tmp =  this.getCredentials().filter(c => c.id === db_id)[0].publications[0]
 		return `${db_id}_${tmp.publication}_${tmp.slot}`
 	}
