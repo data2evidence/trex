@@ -1,13 +1,19 @@
 
-import { assertEquals } from "jsr:@std/assert";
-import { expect } from "jsr:@std/expect";
 
 
 function  test_dbquery5() {
-        console.log("USER WORKER Test #1");
+        console.log("USER WORKER Example");
         const dbm = Trex.databaseManager();
         console.log(dbm.getDatabases())
-        const conn = dbm.getConnection('demo_database', 'demo_cdm', "demo_cdm", {"duckdb": (n:any) => n})
+        console.log(dbm.getDatabaseCredentials())
+        const conn = dbm.getConnection('demo_database', 'demo_cdm', "demo_cdm", {"duckdb": 
+        (sql:string,
+            schemaName:string,
+            vocabSchemaName:string,
+            parameters:any) => {
+                //translate hana sql to duckdb sql
+            return sql;
+        }})
 
         const res = conn.execute("select count(1) from $$SCHEMA$$.person where person_id < ?",[{value:4000}], ((err:any,res:any) => {
             console.log(res);
@@ -15,7 +21,6 @@ function  test_dbquery5() {
 
         }));
         //res.then((r) => console.log(r)).catch((e) => console.error(e));
-        console.log("USER WORKER Test #1 done");
     
 }
 

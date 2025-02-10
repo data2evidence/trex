@@ -99,6 +99,12 @@ export class UserDatabaseManager {
 			return x.id;
 		})
 	}
+
+	getDatabaseCredentials() {
+		return this.#dbm.getCredentials();
+	}
+
+
 	getConnection(db_id, schema, vocab_schema, translationMap) {
 		return new TrexConnection(new TrexDB(db_id), new TrexDB(`${db_id}_pg`), schema,vocab_schema,translationMap);
 	}
