@@ -3,6 +3,7 @@ use eszip::deno_graph;
 
 pub struct DenoGraphFsAdapter<'a>(pub &'a dyn deno_fs::FileSystem);
 
+#[allow(clippy::needless_lifetimes)]
 impl<'a> deno_graph::source::FileSystem for DenoGraphFsAdapter<'a> {
     fn read_dir(&self, dir_url: &deno_graph::ModuleSpecifier) -> Vec<deno_graph::source::DirEntry> {
         use deno_graph::source::DirEntry;

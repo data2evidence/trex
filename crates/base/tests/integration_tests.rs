@@ -26,6 +26,8 @@ use base::{
     server::{Server, ServerEvent, ServerFlags, ServerHealth, Tls},
     worker, DecoratorType,
 };
+
+#[allow(unused_imports)]
 use base::{
     utils::test_utils::{
         self, create_test_user_worker, test_user_runtime_opts, test_user_worker_pool_policy,
@@ -2859,6 +2861,26 @@ async fn test_tmp_fs_should_not_be_available_in_import_stmt() {
         }),
         TerminationToken::new()
     );
+}
+
+#[tokio::test]
+#[serial]
+async fn test_supabase_ai_gte() {
+    let tb = TestBedBuilder::new("./test_cases/main")
+        .with_per_worker_policy(None)
+        .build()
+        .await;
+
+    let resp = tb
+        .request(|b| {
+            b.uri("/supabase-ai")
+                .body(Body::empty())
+                .context("can't make request")
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status().as_u16(), StatusCode::OK);
 }
 
 // -- sb_ai: ORT @huggingface/transformers

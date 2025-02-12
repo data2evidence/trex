@@ -130,6 +130,7 @@ pub struct ModuleInfoCacheModuleAnalyzer<'a> {
     parsed_source_cache: &'a Arc<ParsedSourceCache>,
 }
 
+#[allow(clippy::needless_lifetimes)]
 #[async_trait::async_trait(?Send)]
 impl<'a> deno_graph::ModuleAnalyzer for ModuleInfoCacheModuleAnalyzer<'a> {
     async fn analyze(

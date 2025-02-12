@@ -3,6 +3,7 @@ import {  HTTPException } from "npm:hono/http-exception";
 import { UserMgmtAPI} from "../api/UserMgmtAPI.ts"
 import jwt from 'npm:jsonwebtoken'
 import { ITokenPayload } from 'npm:passport-azure-ad'
+import { Context} from "npm:hono";
 
 const isDev = true;
 const PUBLIC_API_PATHS = ['^/system-portal/dataset/public/list(.*)', '^/system-portal/config/public(.*)']
@@ -65,7 +66,7 @@ interface IUser {
 }
 
 
-export function isClientCredToken(token) {
+export function isClientCredToken(token: IAppTokenPayload) {
   return token.authType && token.authType === 'azure-ad'
 }
 
@@ -92,7 +93,7 @@ const buildADUserFromToken = (token: IAppTokenPayload): IUser => {
 }
 
 
-const buildUserFromToken = (token: IAppTokenPayload, ROLE_SCOPES): IUser => {
+const buildUserFromToken = (token: IAppTokenPayload, ROLE_SCOPES: any): IUser => {
   const { client_id, grant_type, name, sub, email, userMgmtGroups, groups: adGroups } = token
 
   if (typeof userMgmtGroups.alp_tenant_id === 'undefined' || userMgmtGroups.alp_tenant_id.length === 0) {
@@ -185,7 +186,7 @@ export class MriUser {
   private isAlice = false
   private isClientCredReqUser = false
 
-  constructor(private token: IAppTokenPayload | string, ROLE_SCOPES, private userLang: string = 'en') {
+  constructor(private token: IAppTokenPayload | string, ROLE_SCOPES: any, private userLang: string = 'en') {
     if (typeof token === 'string') {
       this.isAlice = true
       return
@@ -232,7 +233,7 @@ export class MriUser {
 }
 
 
-export async function authz(c, next) {
+export async function authz(c: Context, next: any) {
   if(publicURLs.indexOf(c.req.path) > -1){
     logger.log(`PUBLIC URL ${c.req.path} ${publicURLs.indexOf(c.req.path)} NO AUTHZ CHECK`);
     await next()

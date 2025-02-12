@@ -30,7 +30,8 @@ env:
 
 jobs:
   build-push-image:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: trex
     strategy:
       matrix:
         include:
@@ -122,8 +123,8 @@ jobs:
         with:
           package-name: "d2e-trex-base"
           package-type: "container"
-          min-versions-to-keep: 1
-          delete-only-pre-release-versions: "false"
+          min-versions-to-keep: 3
+          delete-only-untagged-versions: "true"
 
       - name: Output Summary
         run: |

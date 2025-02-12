@@ -218,6 +218,7 @@ mod supabase_startup_snapshot {
             sb_ai::init_ops_and_esm(),
             sb_env::init_ops_and_esm(),
             sb_os::sb_os::init_ops_and_esm(),
+            trex_core::sb_trex::init_ops_and_esm(),
             sb_user_workers::init_ops_and_esm(),
             sb_user_event_worker::init_ops_and_esm(),
             sb_events_js_interceptors::init_ops_and_esm(),

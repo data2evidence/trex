@@ -83,6 +83,7 @@ impl TaskQueue {
 /// A permit that when dropped will allow another task to proceed.
 pub struct TaskQueuePermit<'a>(&'a TaskQueue);
 
+#[allow(clippy::needless_lifetimes)]
 impl<'a> Drop for TaskQueuePermit<'a> {
     fn drop(&mut self) {
         self.0.raise_next();
@@ -116,6 +117,7 @@ impl<'a> TaskQueuePermitAcquireFuture<'a> {
     }
 }
 
+#[allow(clippy::needless_lifetimes)]
 impl<'a> Drop for TaskQueuePermitAcquireFuture<'a> {
     fn drop(&mut self) {
         if let Some(task_queue) = self.task_queue.take() {

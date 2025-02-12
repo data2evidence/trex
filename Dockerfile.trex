@@ -1,10 +1,10 @@
 
-FROM rust:1.79.0-bookworm AS builder
+FROM rust:1.83.0-bookworm AS builder
 ARG TARGETPLATFORM
 ARG GIT_V_VERSION
 ARG ONNXRUNTIME_VERSION=1.17.0
 ARG PROFILE=release
-ARG FEATURES
+ARG FEATURES=cli/tracing
 
 RUN apt-get update && apt-get install -y llvm-dev libclang-dev clang cmake
 WORKDIR /usr/src/
@@ -12,20 +12,20 @@ WORKDIR /usr/src/
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=${TARGETPLATFORM} \
     cargo install cargo-strip
 
-COPY . /usr/src/edge-runtime
-WORKDIR /usr/src/edge-runtime
+COPY . /usr/src/trex
+WORKDIR /usr/src/trex
 
-RUN --mount=type=cache,target=/usr/local/cargo/registry,id=${TARGETPLATFORM} --mount=type=cache,target=/usr/src/edge-runtime/target,id=${TARGETPLATFORM} \
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=${TARGETPLATFORM} --mount=type=cache,target=/usr/src/trex/target,id=${TARGETPLATFORM} \
     GIT_V_TAG=${GIT_V_VERSION} cargo build --profile ${PROFILE} --features "${FEATURES}" && \
     cargo strip && \
-    mv /usr/src/edge-runtime/target/${PROFILE}/edge-runtime /root
+    mv /usr/src/trex/target/${PROFILE}/trex /root
 
 FROM node:18.20.4-bookworm-slim AS development
 RUN apt-get update && apt-get install -y libssl-dev && rm -rf /var/lib/apt/lists/*
 RUN apt-get remove -y perl && apt-get autoremove -y
 
 WORKDIR /usr/src
-COPY --from=builder /root/edge-runtime /usr/src/trex
+COPY --from=builder /root/trex /usr/src/trex
 COPY core /usr/src/core
 COPY package.json.plugin /usr/src/plugin/package.json
 COPY bunfig.toml /usr/src/plugin/bunfig.toml
@@ -41,7 +41,7 @@ RUN /usr/src/trex bundle --entrypoint /usr/src/core/server/index.ts --output /us
 RUN /usr/src/trex bundle --entrypoint /usr/src/core/event/index.ts --output /usr/src/core/event/index.eszip 
 
 # Allows usage of npx
-RUN ln -s /usr/src/node_modules/@oven/bun-linux-x64-baseline/bin/bun /usr/src/node_modules/.bin/bun
+RUN ln -sf /usr/src/node_modules/@oven/bun-linux-x64-baseline/bin/bun /usr/src/node_modules/.bin/bun
 
 CMD ["npm", "run", "start"]
 EXPOSE 33000

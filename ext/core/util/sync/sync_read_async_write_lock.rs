@@ -14,6 +14,7 @@ pub struct SyncReadAsyncWriteLockWriteGuard<'a, T: Send + Sync> {
     data: &'a RwLock<T>,
 }
 
+#[allow(clippy::needless_lifetimes)]
 impl<'a, T: Send + Sync> SyncReadAsyncWriteLockWriteGuard<'a, T> {
     pub fn read(&self) -> RwLockReadGuard<'_, T> {
         self.data.read()

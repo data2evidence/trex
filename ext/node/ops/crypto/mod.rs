@@ -1329,6 +1329,7 @@ const MASK_GEN_ALGORITHM_TAG: rsa::pkcs8::der::TagNumber = rsa::pkcs8::der::TagN
 // Context-specific tag number for saltLength.
 const SALT_LENGTH_TAG: rsa::pkcs8::der::TagNumber = rsa::pkcs8::der::TagNumber::new(2);
 
+#[allow(elided_named_lifetimes)]
 impl<'a> TryFrom<rsa::pkcs8::der::asn1::AnyRef<'a>> for PssPrivateKeyParameters<'a> {
     type Error = rsa::pkcs8::der::Error;
 
