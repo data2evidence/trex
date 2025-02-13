@@ -92,7 +92,7 @@ export class KnexMigration {
           database: env.PG__DB_NAME,
           user: env.PG__USER,
           password: env.PG__PASSWORD,
-          //ssl
+          ssl: env.PG__SSL
         }
       };
 

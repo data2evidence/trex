@@ -73,7 +73,7 @@ export const env = {
     PG__PORT: _env.PG__PORT,
     PG__USER: _env.PG_MANAGE_USER,
     PG__PASSWORD: _env.PG_MANAGE_PASSWORD,
-    PG__SSL: _env.PG__SSL,
+    PG__SSL: _env.PG__SSL ?? false,
     IDP_ALP_SVC_CLIENT_ID: _env.IDP__ALP_SVC_CLIENT_ID,
     IDP_DATA_SVC_CLIENT_ID: _env.IDP__ALP_DATA_CLIENT_ID,
     PREFECT_DOCKER_VOLUMES: JSON.parse(_env.PREFECT_DOCKER_VOLUMES) || [],

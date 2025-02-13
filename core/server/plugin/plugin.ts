@@ -19,7 +19,7 @@ export class Plugins {
 			host: env.PG__HOST,
 			port: parseInt(env.PG__PORT),
 			database: env.PG__DB_NAME,
-			ssl: env.PG__SSL ?? false
+			ssl: env.PG__SSL
 		  }
 		this.pgclient = new pg.Client(opt);		
 	}
