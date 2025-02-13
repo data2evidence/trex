@@ -29,7 +29,7 @@ COPY --from=builder /root/trex /usr/src/trex
 COPY core /usr/src/core
 COPY package.json.plugin /usr/src/plugin/package.json
 COPY bunfig.toml /usr/src/plugin/bunfig.toml
-CMD mkdir /usr/src/plugin
+RUN mkdir -p /usr/src/plugin
 COPY .npmrc /usr/src/plugin/.npmrc
 
 COPY package.json /usr/src
