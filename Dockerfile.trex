@@ -27,10 +27,15 @@ RUN apt-get remove -y perl && apt-get autoremove -y
 WORKDIR /usr/src
 COPY --from=builder /root/trex /usr/src/trex
 COPY core /usr/src/core
+RUN mkdir -p /usr/src/plugin
+RUN mkdir -p /usr/src/data/cache
+RUN mkdir -p /usr/src/data/plugins
+COPY .npmrc /usr/src/plugin/.npmrc
 COPY package.json.plugin /usr/src/plugin/package.json
 COPY bunfig.toml /usr/src/plugin/bunfig.toml
-CMD mkdir /usr/src/plugin
-COPY .npmrc /usr/src/plugin/.npmrc
+COPY .npmrc /usr/src/data/plugins/.npmrc
+COPY package.json.plugin /usr/src/data/plugins/package.json
+COPY bunfig.toml /usr/src/data/plugins/bunfig.toml
 
 COPY package.json /usr/src
 COPY package-lock.json /usr/src
