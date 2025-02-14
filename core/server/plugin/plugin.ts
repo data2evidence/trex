@@ -7,9 +7,6 @@ import {addPlugin as addDBPlugin} from "./db.ts"
 import pg from "npm:pg"
 import { Hono } from "npm:hono";
 
-
-
-
 export class Plugins {
 
 	private constructor() {
@@ -19,8 +16,18 @@ export class Plugins {
 			host: env.PG__HOST,
 			port: parseInt(env.PG__PORT),
 			database: env.PG__DB_NAME,
+			ssl: (() => {
+				let ssl: any = JSON.parse(env.PG__SSL.toLowerCase());
+				if (env.PG__CA_ROOT_CERT) {
+				  return {
+					rejectUnauthorized: true,
+					ca: env.PG__CA_ROOT_CERT,
+				  };
+				}
+				return ssl;
+			  })()
 		  }
-		this.pgclient = new pg.Client(opt);		
+		this.pgclient = new pg.Client(opt);
 	}
 
 	private pgclient;
