@@ -65,9 +65,9 @@ jobs:
       - name: Setting up variables
         id: setup
         run: |
-          ACR_IMAGE_PUSH=false
+          DOCKER_BUILD_PUSH_BOOL_STR=false
           if [[ ${{ github.event_name }} == "push" || ${{ github.event_name }} == "workflow_dispatch" ]]; then 
-            ACR_IMAGE_PUSH=true
+            DOCKER_BUILD_PUSH_BOOL_STR=true
           fi
 
           if [[ ${{ github.event_name }} == "workflow_dispatch" ]]; then
@@ -80,7 +80,7 @@ jobs:
 
           echo GIT_BRANCH_NAME=$GIT_BRANCH_NAME >> $GITHUB_OUTPUT
           echo DOCKER_IMG_TAG_NAME=$DOCKER_IMG_TAG_NAME >> $GITHUB_OUTPUT
-          echo ACR_IMAGE_PUSH="${ACR_IMAGE_PUSH}" >> $GITHUB_OUTPUT
+          echo DOCKER_BUILD_PUSH_BOOL_STR="${DOCKER_BUILD_PUSH_BOOL_STR}" >> $GITHUB_OUTPUT
 
       - name: "Login to GitHub Container Registry"
         uses: docker/login-action@v3
@@ -93,26 +93,9 @@ jobs:
         id: build-push2
         uses: docker/build-push-action@v6
         with:
-          push: ${{ steps.setup.outputs.ACR_IMAGE_PUSH }}
+          push: ${{ steps.setup.outputs.DOCKER_BUILD_PUSH_BOOL_STR }}
           platforms: "linux/amd64"
           tags: ghcr.io/data2evidence/${{ matrix.AZ_REGISTRY_REPOSITORY }}:${{ steps.setup.outputs.DOCKER_IMG_TAG_NAME }}
-          context: ${{ matrix.context }}
-          file: ${{ matrix.dockerfile }}
-
-      - name: Login to ACR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ vars.AZ_REGISTRY_NAME }}.azurecr.io
-          username: ${{ vars.AZ_REGISTRY_USERNAME }}
-          password: ${{ secrets.AZ_REGISTRY_PASSWORD }}
-
-      - name: Build and Push
-        id: build-push
-        uses: docker/build-push-action@v6
-        with:
-          push: ${{ steps.setup.outputs.ACR_IMAGE_PUSH }}
-          platforms: "linux/amd64"
-          tags: ${{ vars.AZ_REGISTRY_NAME }}.azurecr.io/${{ matrix.AZ_REGISTRY_REPOSITORY }}:${{ steps.setup.outputs.DOCKER_IMG_TAG_NAME }}
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
 
@@ -133,5 +116,5 @@ jobs:
           echo "GIT_BRANCH_NAME: ${{ env.GIT_BRANCH_NAME }} " >> $GITHUB_STEP_SUMMARY
           echo "GIT_COMMIT_ARG: ${{ github.sha }} " >> $GITHUB_STEP_SUMMARY
           echo "AZ_REGISTRY_REPOSITORY: ${{ matrix.AZ_REGISTRY_REPOSITORY }} " >> $GITHUB_STEP_SUMMARY
-          echo "ACR_IMAGE_PUSH: ${{ steps.setup.outputs.ACR_IMAGE_PUSH }} " >> $GITHUB_STEP_SUMMARY
+          echo "DOCKER_BUILD_PUSH_BOOL_STR: ${{ steps.setup.outputs.DOCKER_BUILD_PUSH_BOOL_STR }} " >> $GITHUB_STEP_SUMMARY
           echo "DOCKER_IMG_TAG_NAME: ${{ steps.setup.outputs.DOCKER_IMG_TAG_NAME }} " >> $GITHUB_STEP_SUMMARY
