@@ -80,7 +80,7 @@ export const env = {
     GIT_COMMIT: _env.GIT_COMMIT,
     GH_TOKEN: _env.GH_TOKEN,
     GH_ORG: 'data2evidence',
-    PLUGINS_PATH: _env.PLUGINS_PATH || "./plugin",
+    PLUGINS_PATH: _env.PLUGINS_PATH || "./data/plugins",
     PLUGINS_API_VERSION: _env.PLUGINS_API_VERSION || 'latest',
     PLUGINS_INIT: _env.PLUGINS_SEED? JSON.parse(_env.PLUGINS_SEED) : [],
     PLUGINS_SEED_UPDATE: JSON.parse(_env.PLUGINS_SEED_UPDATE) === true || false,
