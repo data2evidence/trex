@@ -92,7 +92,16 @@ export class KnexMigration {
           database: env.PG__DB_NAME,
           user: env.PG__USER,
           password: env.PG__PASSWORD,
-          ssl: env.PG__SSL
+          ssl: (() => {
+            let ssl: any = JSON.parse(env.PG__SSL.toLowerCase());
+            if (env.PG__CA_ROOT_CERT) {
+              return {
+                rejectUnauthorized: true,
+                ca: env.PG__CA_ROOT_CERT,
+              };
+            }
+            return ssl;
+            })()
         }
       };
 

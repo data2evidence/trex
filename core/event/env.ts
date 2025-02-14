@@ -6,6 +6,7 @@ export const env = {
     PG__PORT: _env.PG__PORT,
     PG_USER: _env.PG_SUPER_USER,
     PG_PASSWORD: _env.PG_SUPER_PASSWORD,
-    PG__SSL: _env.PG__SSL ?? false
+    PG__SSL: _env.PG__SSL,
+    PG__CA_ROOT_CERT: _env.PG__CA_ROOT_CERT
 }
 
