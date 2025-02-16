@@ -90,7 +90,7 @@ function _addService(app: Hono, url: string, service: string, rmsrc: boolean) {
 		let newHeaders = new Headers(c.req.raw.headers)
 		newHeaders.append('x-source-origin', env.GATEWAY_WO_PROTOCOL_FQDN)
 		const path = rmsrc? c.req.raw.url.replace(/^[^#]*?:\/\/.*?\//,'/').replace(url,'') : c.req.raw.url.replace(/^[^#]*?:\/\/.*?\//,'/');
-		let req = {headers: newHeaders, method: c.req.method, body: c.req.raw.body};
+		let req = {redirect: "manual", headers: newHeaders, method: c.req.method, body: c.req.raw.body};
 		const res = await fetch(`${service_url}${path}`,req )
 		return res;
 	});

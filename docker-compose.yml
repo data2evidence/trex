@@ -5,21 +5,16 @@ services:
       dockerfile: Dockerfile.trex
       target: development
     pull_policy: never
-    platform: linux/arm64/v8
     command: npm run watch
     ports:
-      - 33000:33000
       - 8001:8001
       - 25432:5432
     volumes:
       - ./services/trex/core:/usr/src/core
       - ./services/trex/data:/usr/src/data
-
-     # - ./services/trex/plugins:/usr/src/plugins
       - ./functions:/usr/src/plugins/d2ef
       - ./services/trex/package.json:/usr/src/package.json
     environment:
       LOCAL_DEBUG: "true"
       DATABASE_CREDENTIALS: ${DATABASE_CREDENTIALS}
       PLUGIN_BASE_PATH: "./plugins"
-      PLUGINS_SEED_UPDATE: true
