@@ -29,7 +29,7 @@ COPY --from=builder /root/trex /usr/src/trex
 COPY core /usr/src/core
 COPY package.json.plugin /usr/src/plugin/package.json
 COPY bunfig.toml /usr/src/plugin/bunfig.toml
-CMD mkdir /usr/src/plugin
+RUN mkdir -p /usr/src/plugin
 COPY .npmrc /usr/src/plugin/.npmrc
 
 COPY package.json /usr/src
@@ -41,7 +41,7 @@ RUN /usr/src/trex bundle --entrypoint /usr/src/core/server/index.ts --output /us
 RUN /usr/src/trex bundle --entrypoint /usr/src/core/event/index.ts --output /usr/src/core/event/index.eszip 
 
 # Allows usage of npx
-RUN ln -s /usr/src/node_modules/@oven/bun-linux-x64-baseline/bin/bun /usr/src/node_modules/.bin/bun || true
+RUN ln -sf /usr/src/node_modules/@oven/bun-linux-x64-baseline/bin/bun /usr/src/node_modules/.bin/bun
 
 CMD ["npm", "run", "start"]
 EXPOSE 33000
