@@ -18,7 +18,10 @@ export function addPlugin(app: Hono, value: any, dir: string) {
         value.routes.forEach((r: any) => {
             _addStatic(app, `${r.source}`, `${dir}${r.target}/`);
     });
-    app.use('/portal/login', serveStatic({path: `${dir}/portal.index.html`}));
+    app.get('/', (c) => { return c.redirect(`/portal/`) })
+    app.use('/portal/login', serveStatic({path: `${dir}resources/portal/index.html`}));
+    app.use('/portal/researcher/*', serveStatic({path: `${dir}resources/portal/index.html`}));
+    app.use('/portal/systemadmin/*', serveStatic({path: `${dir}resources/portal/index.html`}));
     if(value.uiplugins) {
         const tmp = JSON.parse(global.PLUGINS_JSON);
         for(const [k,v] of Object.entries(value.uiplugins)) {

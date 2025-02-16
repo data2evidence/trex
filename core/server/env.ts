@@ -29,7 +29,16 @@ export const publicURLs = [
     '/usermgmt/api/user-group/public',
     '/system-portal/dataset/public/list',
     '/system-portal/feature/list',
-    '/system-portal/config/public/overview-description'
+    '/system-portal/config/public/overview-description',
+    'index.html',
+    '/api',
+    '/oidc',
+    '/oidc/auth',
+    '/oidc/session/end',
+    '/oidc/session/end/confirm',
+    '/sign-in',
+    '/consent',
+    '/callback'
   ]
 
   export const authz_publicURLs = publicURLs.concat([
