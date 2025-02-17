@@ -11,8 +11,7 @@ const JWKS = createRemoteJWKSet(
 );
 
 export async function authn(c: Context, next: Function) {
-
-  if(publicURLs.indexOf(c.req.path) > -1 ){
+  if(publicURLs.some((url) => new RegExp(url).test(c.req.path))){
     logger.log(`PUBLIC URL ${c.req.path} ${publicURLs.indexOf(c.req.path)} NO AUTHN CHECK`);
   } else {
     let token = "";
