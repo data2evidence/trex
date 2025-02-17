@@ -3,6 +3,7 @@ import {waitfor} from "./utils.ts"
 import { authn } from "../auth/authn.ts"
 import { authz } from "../auth/authz.ts";
 import { Hono, Context } from "npm:hono";
+import { proxy } from 'npm:hono/proxy'
 
 import { STATUS_CODE } from 'https://deno.land/std/http/status.ts';
 
@@ -86,11 +87,23 @@ function _addFunction(app: Hono, url: string, path: string, imports: any, fncfg:
 
 function _addService(app: Hono, url: string, service: string, rmsrc: boolean) {
 	const service_url = env.SERVICE_ROUTES[service];
-	app.all(url+"/*", authn, authz, async (c: Context) => {
+	let postfix =""
+	if(!url.endsWith("*")) {
+		postfix = "/*";
+	}
+	app.all(url+postfix, authn, authz, async (c: Context) => {
+
 		let newHeaders = new Headers(c.req.raw.headers)
 		newHeaders.append('x-source-origin', env.GATEWAY_WO_PROTOCOL_FQDN)
 		const path = rmsrc? c.req.raw.url.replace(/^[^#]*?:\/\/.*?\//,'/').replace(url,'') : c.req.raw.url.replace(/^[^#]*?:\/\/.*?\//,'/');
-		let req = {redirect: "manual", headers: newHeaders, method: c.req.method, body: c.req.raw.body};
+		let req = {headers: newHeaders, method: c.req.method, body: c.req.raw.body};
+		/*if(path.startsWith("/oidc/auth")) {
+			req.redirect = 'manual';
+		} else {
+			req.redirect = 'follow';
+		}
+		return proxy(`${service_url}${path}`, req)*/
+
 		const res = await fetch(`${service_url}${path}`,req )
 		return res;
 	});
