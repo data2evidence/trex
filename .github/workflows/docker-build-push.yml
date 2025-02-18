@@ -117,8 +117,10 @@ jobs:
 
       - name: DC up
         run: npm run start:d2e
-      
-        
+
+      - name: logs
+        run: npm run logs:d2e
+
       - name: Output Summary
         run: |
           echo "### Output summary 🚀" >> $GITHUB_STEP_SUMMARY

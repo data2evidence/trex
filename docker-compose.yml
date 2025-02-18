@@ -3,7 +3,6 @@ services:
     build:
       context: ../../../
       dockerfile: Dockerfile.trex
-      target: development
     pull_policy: never
     command: npm run watch
     ports:
