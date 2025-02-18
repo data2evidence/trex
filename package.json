@@ -24,8 +24,10 @@
   "license": "ISC",
   "dependencies": {
     "bun": "^1.1.34",
-    "deno": "2.1.4",
-    "@oven/bun-linux-x64-baseline": "^1.2.2"
+    "deno": "2.1.4"
+  },
+  "optionalDependencies": {
+    "@oven/bun-linux-x64-baseline": "^1.1.34"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"
