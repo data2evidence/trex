@@ -119,6 +119,7 @@ jobs:
         run: npm run start:d2e
 
       - name: logs
+        if: success() || failure()
         run: npm run logs:d2e
 
       - name: Output Summary
