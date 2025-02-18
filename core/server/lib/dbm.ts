@@ -14,6 +14,16 @@ export class DatabaseManager {
 			host: env.PG__HOST,
 			port: parseInt(env.PG__PORT),
 			database: env.PG__DB_NAME,
+            ssl: (() => {
+				let ssl: any = JSON.parse(env.PG__SSL.toLowerCase());
+				if (env.PG__CA_ROOT_CERT) {
+				  return {
+					rejectUnauthorized: true,
+					ca: env.PG__CA_ROOT_CERT,
+				  };
+				}
+				return ssl;
+			  })()
 		  }
 		this.pgclient = new pg.Client(opt);	
         this.trexdbm = Trex.DatabaseManager.getDatabaseManager();
@@ -49,21 +59,7 @@ export class DatabaseManager {
         return this.trexdbm.getPublications();
     }
 
-    public async getCredentials() {
-        const r = await this.pgclient.query(`SELECT id as code, * from trex.db`);
-        const result = r.rows.map((x:any) => {
-                x.credentials = x.credentials.map((y:any) => { 
-                    return {
-                        username: y.username,
-                        userScope: y.userScope,
-                        serviceScope:y.serviceScope
-                    };
-                });
-                return x;
-            }
-        )
-        return result;
-    }
+
 
    private  credentialsPrivateKey: string =
   env.DB_CREDENTIALS__PRIVATE_KEY!.replace(/\\n/g, "\n");
@@ -93,10 +89,34 @@ export class DatabaseManager {
   return ret
 };
 
+
+
+private async _getCredentials(fn:any) {
+    const r = await this.pgclient.query(`SELECT id as code, * from trex.db`);
+    const result = r.rows.map((x:any) => {
+        x.credentials = x.credentials.map(fn);
+        return x;
+    });
+    return JSON.parse(JSON.stringify(result));
+}
+public async getCredentials() {
+    return await this._getCredentials((y:any) => { 
+                return {
+                    username: y.username,
+                    userScope: y.userScope,
+                    serviceScope:y.serviceScope
+                };
+            });
+            
+}
+
+public async getCredentialsEncrypted() {
+    return await this._getCredentials((y:any) => y);
+}
+
     public async getCredentialsDecrypted() {
-        const r = await this.pgclient.query(`SELECT id as code, * from trex.db`);
-        const result = r.rows.map((x:any) => {
-                x.credentials = x.credentials.map((y:any) => { 
+        return await this._getCredentials((y:any) => { 
+ 
                     return {
                         username: y.username,
                         userScope: y.userScope,
@@ -104,10 +124,6 @@ export class DatabaseManager {
                         password: this.decrypt(y.password).replace(y.salt, "")
                     };
                 });
-                return x;
-            }
-        )
-        return JSON.parse(JSON.stringify(result));
     }
 
 
