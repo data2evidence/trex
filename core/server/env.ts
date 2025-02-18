@@ -29,7 +29,13 @@ export const publicURLs = [
     '/usermgmt/api/user-group/public',
     '/system-portal/dataset/public/list',
     '/system-portal/feature/list',
-    '/system-portal/config/public/overview-description'
+    '/system-portal/config/public/overview-description',
+    '/index*',
+    '/api/*',
+    '/oidc/*',
+    '/sign-in',
+    '/consent',
+    '/callback'
   ]
 
   export const authz_publicURLs = publicURLs.concat([
@@ -42,7 +48,7 @@ export const env = {
     TLS__INTERNAL__KEY: _env.TLS__INTERNAL__KEY?.replace(/\\n/g, '\n'),
     TLS__INTERNAL__CA_CRT: _env.TLS__INTERNAL__CA_CRT?.replace(/\\n/g, '\n'),
     SERVICE_ROUTES: JSON.parse(_env.SERVICE_ROUTES),
-    GATEWAY_WO_PROTOCOL_FQDN: _env.GATEWAY__WO_PROTOCOL_FQDN || "localhost:41100",
+    GATEWAY_WO_PROTOCOL_FQDN: _env.GATEWAY__WO_PROTOCOL_FQDN || "localhost",
     LOGTO_CLIENT_ID: _env.LOGTO__CLIENT_ID,
     LOGTO_SCOPE: _env.LOGTO__SCOPE,
     APP_LOCALE: _env.APP_LOCALE,
@@ -65,7 +71,7 @@ export const env = {
     PREFECT_DOCKER_NETWORK: _env.PREFECT_DOCKER_NETWORK || "alp_data",
     PREFECT_POOL: "docker-pool",
     SERVICE_ENV: JSON.parse(_env.SERVICE_ENV),
-    CADDY__ALP__PUBLIC_FQDN: _env.CADDY__ALP__PUBLIC_FQDN || 'localhost:41100',
+    CADDY__ALP__PUBLIC_FQDN: _env.CADDY__ALP__PUBLIC_FQDN || 'localhost',
     PREFECT_HEALTH_CHECK: _env.PREFECT_API_URL,
   
     PG__DB_NAME: _env.PG__DB_NAME,
@@ -73,6 +79,8 @@ export const env = {
     PG__PORT: _env.PG__PORT,
     PG__USER: _env.PG_MANAGE_USER,
     PG__PASSWORD: _env.PG_MANAGE_PASSWORD,
+    PG__SSL: _env.PG__SSL ?? "false",
+    PG__CA_ROOT_CERT: _env.PG__CA_ROOT_CERT,
     IDP_ALP_SVC_CLIENT_ID: _env.IDP__ALP_SVC_CLIENT_ID,
     IDP_DATA_SVC_CLIENT_ID: _env.IDP__ALP_DATA_CLIENT_ID,
     PREFECT_DOCKER_VOLUMES: JSON.parse(_env.PREFECT_DOCKER_VOLUMES) || [],
