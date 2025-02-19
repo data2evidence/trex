@@ -118,6 +118,10 @@ jobs:
       - name: DC up
         run: npm run start:d2e
 
+      - name: stop
+        if: success() || failure()
+        run: npm run stop:d2e
+
       - name: logs
         if: success() || failure()
         run: npm run logs:d2e
