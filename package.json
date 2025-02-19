@@ -12,6 +12,7 @@
     "init:d2e": "PROJECT_NAME=trex PORT=41100 ENV_TYPE=local d2e init",
     "start:d2e": "CADDY__CONFIG=../../../.deploy/caddy-config PROJECT_NAME=trex PORT=41100 ENV_TYPE=local d2e -e -c docker-compose.yml start",
     "build:d2e": "PROJECT_NAME=trex PORT=41100 ENV_TYPE=local d2e -e -c docker-compose.yml build",
+    "stop:d2e": "PROJECT_NAME=trex PORT=41100 ENV_TYPE=local d2e -e -c docker-compose.yml stop",
     "logs:d2e": "PROJECT_NAME=trex PORT=41100 ENV_TYPE=local d2e -e -c docker-compose.yml logs",
     "watchtest": "RUST_LOG=info RUST_BACKTRACE=full npx nodemon --watch test -e ts --exec ./target/debug/trex start --main-service ./test/main --event-worker ./test/event-manager --sql 25432",
     "test": "bash ./scripts/trextest.sh",
