@@ -1,19 +1,16 @@
 services:
   trex:
     build:
-      context: ./services/trex
+      context: ../../../
       dockerfile: Dockerfile.trex
-      target: development
     pull_policy: never
     command: npm run watch
     ports:
       - 8001:8001
       - 25432:5432
     volumes:
-      - ./services/trex/core:/usr/src/core
-      - ./services/trex/data:/usr/src/data
-      - ./functions:/usr/src/plugins/d2ef
-      - ./services/trex/package.json:/usr/src/package.json
+      - ../../../core:/usr/src/core
+      - ../../../package.json:/usr/src/package.json
     environment:
       LOCAL_DEBUG: "true"
       DATABASE_CREDENTIALS: ${DATABASE_CREDENTIALS}
