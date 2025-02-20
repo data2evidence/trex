@@ -1,6 +1,6 @@
 # Trex 
 
-[![Docker Build and Push to Azure CR](https://github.com/data2evidence/trex/actions/workflows/docker-build-push.yml/badge.svg)](https://github.com/data2evidence/trex/actions/workflows/docker-build-push.yml) &nbsp;&nbsp; [![NPM build package](https://github.com/data2evidence/trex/actions/workflows/npm-ci.yml/badge.svg)](https://github.com/data2evidence/trex/actions/workflows/npm-ci.yml)
+[![Docker Build and Up](https://github.com/data2evidence/trex/actions/workflows/docker-build-push.yml/badge.svg)](https://github.com/data2evidence/trex/actions/workflows/docker-build-push.yml) &nbsp;&nbsp; [![NPM build package](https://github.com/data2evidence/trex/actions/workflows/npm-ci.yml/badge.svg)](https://github.com/data2evidence/trex/actions/workflows/npm-ci.yml)
 
 Trex is the application server for D2E
 
