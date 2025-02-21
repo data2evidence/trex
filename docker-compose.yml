@@ -15,3 +15,6 @@ services:
       LOCAL_DEBUG: "true"
       DATABASE_CREDENTIALS: ${DATABASE_CREDENTIALS}
       PLUGIN_BASE_PATH: "./plugins"
+  alp-minerva-postgres:
+    ports:
+      - 5432:5432

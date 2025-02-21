@@ -49,7 +49,7 @@ async function _callWorker (req: any, servicePath: string, imports: any, fncfg: 
 		workerTimeoutMs: env.WATCH[fncfg.env] ? 1 * 60 * 1000 : 30 * 60 * 1000, noModuleCache: false,
 		importMapPath: imports, envVars: _myenv,
 		forceCreate: env._FORCE_CREATE || watch, netAccessDisabled: false, 
-		cpuTimeSoftLimitMs: 100000, cpuTimeHardLimitMs: 200000,
+		cpuTimeSoftLimitMs: 1000000, cpuTimeHardLimitMs: 2000000,
 		decoratorType: "typescript_with_metadata" 
 	}
 	if(fncfg.eszip) {
