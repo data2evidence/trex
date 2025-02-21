@@ -2,9 +2,13 @@
 
 [![Docker Build and Up](https://github.com/data2evidence/trex/actions/workflows/docker-build-push.yml/badge.svg)](https://github.com/data2evidence/trex/actions/workflows/docker-build-push.yml) &nbsp;&nbsp; [![NPM build package](https://github.com/data2evidence/trex/actions/workflows/npm-ci.yml/badge.svg)](https://github.com/data2evidence/trex/actions/workflows/npm-ci.yml)
 
-Trex is the application server for D2E
+Trex is the runtime environment of D2E
 
 ### Please read the [D2E Setup Guide](https://docs.d2e.sg) to setup D2E and Trex
+
+#### Get in contact
+
+Please [click here](https://discord.gg/5XtHky2BZe) to join us in Discord.
 
 #### Plugin Installation
 Endpoints:
@@ -26,6 +30,4 @@ Plugin metadata is stored in the `package.json` file in the trex section. Suppor
 - flow (prefect dataflows)
 
 
-#### Get in contact
 
-Please [click here](https://discord.gg/5XtHky2BZe) to join us in Discord.
