@@ -312,6 +312,7 @@ export async function authz(c: Context, next: any) {
               return next()
             } else {
               logger.error(`datasetId check: No Access to datasetId ${datasetId}`)
+              throw new HTTPException(403, { res: new Response('Unauthorized access to dataset', {status: 403 })})
             }
           } else {
             logger.error(`\x1b[0m\x1b[41m>>> NO datasetId defined in scope @ ${c.req.method} ${c.req.path}<<<\x1b[0m`)
