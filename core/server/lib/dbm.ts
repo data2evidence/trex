@@ -31,7 +31,18 @@ export class DatabaseManager {
 
     private trexdbm;
 	private pgclient;
-    private insert_query = `INSERT INTO trex.db (id, host, port, "name", dialect, credentials, vocab_schemas, publications, db_extra ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`;
+    private insert_query = `INSERT INTO trex.db \
+    (id, host, port, "name", dialect, credentials, vocab_schemas, publications, db_extra, authentication_mode ) \
+    values ($1,$2,$3,$4,$5,$6,$7,$8,$9, $10) ON CONFLICT (id) 
+     DO UPDATE  SET host = EXCLUDED.host, \
+    port = EXCLUDED.port, \
+    "name" = EXCLUDED."name", \
+    dialect = EXCLUDED.dialect, \
+    credentials = EXCLUDED.credentials, \
+    vocab_schemas = EXCLUDED.vocab_schemas, \
+    publications = EXCLUDED.publications, \
+    db_extra = EXCLUDED.db_extra, \
+    authentication_mode = EXCLUDED.authentication_mode`;
 
     private static _dbm : DatabaseManager;
 
@@ -49,7 +60,8 @@ export class DatabaseManager {
     public async setCredentials(c: any) {
         const v = new Validator();
         v.validate(c, dbSchema);
-        const params = [c.code, c.host, c.port, c.name, c.dialect, JSON.stringify(c.credentials), JSON.stringify(c.vocabSchemas) || null, JSON.stringify(c.publications) || null, JSON.stringify(c.extra) || null ];
+
+        const params = [c.code || c.id, c.host, c.port, c.name, c.dialect, JSON.stringify(c.credentials), JSON.stringify(c.vocabSchemas) || null, JSON.stringify(c.publications) || null, JSON.stringify(c.extra.Internal) || null, JSON.stringify(c.authenticationMode) || null ];
         const r = await this.pgclient.query(this.insert_query, params);
         this.trexdbm.setCredentials(await this.getCredentialsDecrypted());
         return c.code;
@@ -103,8 +115,8 @@ public async getCredentials() {
     return await this._getCredentials((y:any) => { 
                 return {
                     username: y.username,
-                    userScope: y.userScope,
-                    serviceScope:y.serviceScope
+                    userScope: y.userScope || y.user_scope,
+                    serviceScope:y.serviceScope || y.service_scope
                 };
             });
             
@@ -119,8 +131,8 @@ public async getCredentialsEncrypted() {
  
                     return {
                         username: y.username,
-                        userScope: y.userScope,
-                        serviceScope:y.serviceScope,
+                        userScope: y.userScope || y.user_scope,
+                        serviceScope:y.serviceScope || y.service_scope,
                         password: this.decrypt(y.password).replace(y.salt, "")
                     };
                 });

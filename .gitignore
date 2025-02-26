@@ -6,6 +6,8 @@ d2e-functions-old/
 .idea/
 .idea
 data/
+.deploy
+.env*
 plugins/
 .vscode/*
 !.vscode/launch.template.jsonc
