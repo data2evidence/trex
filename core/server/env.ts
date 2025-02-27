@@ -25,7 +25,7 @@ export let logger = {
 };
 
 export const publicURLs = [
-    '^/portalsvc/public-graphql$$',
+    '^/portalsvc/public-graphql$',
     '^/usermgmt/api/user-group/public$',
     '^/system-portal/dataset/public/list$',
     '^/system-portal/feature/list$',
@@ -34,7 +34,7 @@ export const publicURLs = [
     '^/api/*$',
     '^/oidc/*$',
     '^/sign-in$',
-    '^/consent$$',
+    '^/consent$',
     '^/callback$'
   ]
 

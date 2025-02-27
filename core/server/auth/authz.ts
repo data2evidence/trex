@@ -288,8 +288,14 @@ export async function authz(c: Context, next: any) {
       }*/
 
       const { scopes } = match
-      // the allowed scopes for a url should be found in the user's assigned scopes      
-      if(hasRequiredScopes(scopes, mriUserObj.mriScopes.concat(mriUserObj.studyScopes))) {
+      // the allowed scopes for a url should be found in the user's assigned scopes
+      const assignedScopes = mriUserObj.mriScopes.concat(mriUserObj.studyScopes)
+
+      if(!hasRequiredScopes(scopes, assignedScopes)) {
+        logger.info(`inside authz: Forbidden, token does not have required scope`)
+        logger.debug(`inside authz: Forbidden url: ${originalUrl} scope: ${JSON.stringify(match)} user: ${JSON.stringify(mriUserObj)}`)
+        throw new HTTPException(403, { res: new Response('Forbidden', {status: 403 })})  
+      } else {
         logger.info(`AUTHORIZED ACCESS: user ${mriUserObj.userId}, url ${originalUrl}`)
         if (isDev) {
           //logger.info(`🚀 inside au, req.headers: ${JSON.stringify(c.req.headers)}`)
@@ -320,13 +326,8 @@ export async function authz(c: Context, next: any) {
             //return next()
           }
         }
-
         return next()
       }
-
-      logger.info(`inside authz: Forbidden, token does not have required scope`)
-      logger.debug(`inside authz: Forbidden url: ${originalUrl} scope: ${JSON.stringify(match)} user: ${JSON.stringify(mriUserObj)}`)
-      throw new HTTPException(403, { res: new Response('Forbidden', {status: 403 })})
     } else {
       return userMgmtApi.getUserGroups(c.req.raw.headers.get('authorization'), idpUserId).then(userGroups => {
         logger.log(`NO SCOPE FOUND ${originalUrl}`)
