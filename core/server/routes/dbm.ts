@@ -4,7 +4,7 @@ import { Hono, Context } from "npm:hono";
 
 import { DatabaseManager } from '../lib/dbm.ts';
 import { logger } from '../env.ts';
-import * as _ from "npm:lodash";
+import * as _ from "npm:lodash-es";
 
 export function addRoutes(app: Hono) {
     
@@ -41,10 +41,11 @@ export function addRoutes(app: Hono) {
         return c.json(r);
     });
 
-    app.put('/trex/db', authn, authz, async (c: Context) => {
+    app.put('/trex/db/', authn, authz, async (c: Context) => {
         const body = await c.req.json();
         let r = await (await DatabaseManager.get()).getCredentialsEncrypted();
-        let x = _.merge({}, r, body);
+        let y = r.filter((x: any) => x.id === body.id)[0];
+        let x = _.merge({}, y, {authenticationMode:y.authentication_mode, extra:{Internal:y.db_extra}, vocabSchemas:y.vocab_schemas}, body);
         try {
             const id = await (await DatabaseManager.get()).setCredentials(x);
             return c.json({"id": id});
