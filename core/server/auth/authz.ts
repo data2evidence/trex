@@ -259,80 +259,76 @@ export async function authz(c: Context, next: any) {
     //const { client_id, grant_type } = token
     const sub = token[env.GATEWAY_IDP_SUBJECT_PROP]
     const idpUserId = token["oid"] || sub
+    let mriUserObj: any
 
     const match = global.REQUIRED_URL_SCOPES.find(
       ({ path, httpMethods }) =>
         new RegExp(path).test(originalUrl) && (typeof httpMethods == 'undefined' || httpMethods.indexOf(method) > -1)
     )
 
-    if (match) {
-      let mriUserObj: any
+    if(!match) {
+      // return response 404 (resource not found)
+      throw new HTTPException(404, { res: new Response('Not found', {status: 404 })})  
+    }
   
-      if (isClientCredToken(token)) {
-        mriUserObj = new MriUser(token, global.ROLE_SCOPES).adUserObject
-      } else {
-        try {
-          const userGroups = await userMgmtApi.getUserGroups(c.req.raw.headers.get('authorization'), idpUserId)
-          token["userMgmtGroups"] = userGroups
-          mriUserObj = new MriUser(token, global.ROLE_SCOPES).b2cUserObject
-        } catch (error) {
-          logger.error(error)
-          throw new HTTPException(500, { res: new Response('Error', {status: 500 })})
-        }
-      }
-  
-      /*const userScopes = await getUserScopes(bearerToken, originalUrl)
-      if (scopes.some(i => userScopes.includes(i))) {
-        logger.debug(`User scopes allowed for url ${originalUrl}`)
-        return next()
-      }*/
-
-      const { scopes } = match
-      // the allowed scopes for a url should be found in the user's assigned scopes
-      const assignedScopes = mriUserObj.mriScopes.concat(mriUserObj.studyScopes)
-
-      if(!hasRequiredScopes(scopes, assignedScopes)) {
-        logger.info(`inside authz: Forbidden, token does not have required scope`)
-        logger.debug(`inside authz: Forbidden url: ${originalUrl} scope: ${JSON.stringify(match)} user: ${JSON.stringify(mriUserObj)}`)
-        throw new HTTPException(403, { res: new Response('Forbidden', {status: 403 })})  
-      } else {
-        logger.info(`AUTHORIZED ACCESS: user ${mriUserObj.userId}, url ${originalUrl}`)
-        if (isDev) {
-          //logger.info(`🚀 inside au, req.headers: ${JSON.stringify(c.req.headers)}`)
-        }
-
-        if(requireDatasetId(mriUserObj.studyScopes)) {
-          let datasetId: string | null = null;
-          const datasetIdKey = match["datasetId"] ?? "datasetId"
-          // Look for datasetId in query param
-          datasetId = c.req.query(datasetIdKey);
-
-          // Look for datasetId in body if not found in query parameter
-          if (!datasetId) {
-            datasetId = await _lookForDatasetIdInBody(c, datasetIdKey)
-          }
-
-          if(datasetId) {
-            if(mriUserObj.alpRoleMap.STUDY_RESEARCHER_ROLE.indexOf(datasetId) > -1) {
-              logger.info(`AUTHORIZED STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}`)
-              return next()
-            } else {
-              logger.error(`datasetId check: No Access to datasetId ${datasetId}`)
-              throw new HTTPException(403, { res: new Response('Unauthorized access to dataset', {status: 403 })})
-            }
-          } else {
-            logger.error(`\x1b[0m\x1b[41m>>> NO datasetId defined in scope @ ${c.req.method} ${c.req.path}<<<\x1b[0m`)
-            //logger.info(`\x1b[0m\x1b[41mTMP OVERWRITE STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}\x1b[0m`)
-            //return next()
-          }
-        }
-        return next()
-      }
+    if (isClientCredToken(token)) {
+      mriUserObj = new MriUser(token, global.ROLE_SCOPES).adUserObject
     } else {
-      return userMgmtApi.getUserGroups(c.req.raw.headers.get('authorization'), idpUserId).then(userGroups => {
-        logger.log(`NO SCOPE FOUND ${originalUrl}`)
-        throw new HTTPException(403, { res: new Response('Forbidden', {status: 403 })})
-      })
+      try {
+        const userGroups = await userMgmtApi.getUserGroups(c.req.raw.headers.get('authorization'), idpUserId)
+        token["userMgmtGroups"] = userGroups
+        mriUserObj = new MriUser(token, global.ROLE_SCOPES).b2cUserObject
+      } catch (error) {
+        logger.error(error)
+        throw new HTTPException(500, { res: new Response('Error', {status: 500 })})
+      }
+    }
+
+    /*const userScopes = await getUserScopes(bearerToken, originalUrl)
+    if (scopes.some(i => userScopes.includes(i))) {
+      logger.debug(`User scopes allowed for url ${originalUrl}`)
+      return next()
+    }*/
+
+    const { scopes } = match
+    // the allowed scopes for a url should be found in the user's assigned scopes
+    const assignedScopes = mriUserObj.mriScopes.concat(mriUserObj.studyScopes)
+
+    if(!hasRequiredScopes(scopes, assignedScopes)) {
+      logger.info(`inside authz: Forbidden, token does not have required scope`)
+      logger.debug(`inside authz: Forbidden url: ${originalUrl} scope: ${JSON.stringify(match)} user: ${JSON.stringify(mriUserObj)}`)
+      throw new HTTPException(403, { res: new Response('Forbidden', {status: 403 })})  
+    }
+
+    logger.info(`AUTHORIZED ACCESS: user ${mriUserObj.userId}, url ${originalUrl}`)
+    if (isDev) {
+      //logger.info(`🚀 inside au, req.headers: ${JSON.stringify(c.req.headers)}`)
+    }
+
+    if(!requireDatasetId(mriUserObj.studyScopes)) {
+      next()
+    }
+    let datasetId: string | null = null;
+    const datasetIdKey = match["datasetId"] ?? "datasetId"
+    // Look for datasetId in query param
+    datasetId = c.req.query(datasetIdKey);
+
+    // Look for datasetId in body if not found in query parameter
+    if (!datasetId) {
+      datasetId = await _lookForDatasetIdInBody(c, datasetIdKey)
+    }
+
+    if(!datasetId) {
+      logger.error(`\x1b[0m\x1b[41m>>> NO datasetId defined in scope @ ${c.req.method} ${c.req.path}<<<\x1b[0m`)
+      throw new HTTPException(403, { res: new Response('Dataset id is missing in the request', {status: 403 })})
+    }
+
+    if(mriUserObj.alpRoleMap.STUDY_RESEARCHER_ROLE.indexOf(datasetId) > -1) {
+      logger.info(`AUTHORIZED STUDY ACCESS: user ${mriUserObj.userId}, url ${originalUrl}`)
+      return next()
+    } else {
+      logger.error(`datasetId check: No Access to datasetId ${datasetId}`)
+      throw new HTTPException(403, { res: new Response('Unauthorized access to dataset', {status: 403 })})
     }
   }
 }
