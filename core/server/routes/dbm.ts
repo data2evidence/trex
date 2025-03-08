@@ -9,16 +9,11 @@ import * as _ from "npm:lodash-es";
 export function addRoutes(app: Hono) {
     
     app.post('/trex/db/pub/:name', authn, authz, async (c: Context) => {
+        const name = c.req.param('name');
         const body = await c.req.json();
-        let r = await (await DatabaseManager.get()).getCredentialsEncrypted();
-        //let w = r.filter((x: any) => x.id != body.id).push(body);
-        try {
-            const id = await (await DatabaseManager.get()).addCredentials(body);
-            return c.json({"id": id});
-        } catch (e) {
-            logger.error(e);
-            return c.text(e, 500);
-        }
+
+        Trex.addDB(body.publication, body.slot_name, name, body.db_host, Number(body.db_port), body.db_name, body.db_username, body.db_password);
+        return c.json({"message": "ok"});
     });
 
     app.delete('/trex/db/:name', authn, authz, async (c: Context) => {
@@ -34,7 +29,7 @@ export function addRoutes(app: Hono) {
     app.post('/trex/db/', authn, authz, async (c: Context) => {
         const body = await c.req.json();
         try {
-            const id = await (await DatabaseManager.get()).addCredentials(body);
+            const id = await (await DatabaseManager.get()).setCredentials(body);
             return c.json({"id": id});
         } catch (e) {
             logger.error(e);
@@ -61,7 +56,7 @@ export function addRoutes(app: Hono) {
         let x = _.merge({}, y, {authenticationMode:y.authentication_mode, extra:{Internal:y.db_extra}, vocabSchemas:y.vocab_schemas}, body);
         //let w = r.filter((x: any) => x.id != body.id).push(x);
         try {
-            const id = await (await DatabaseManager.get()).addCredentials(x);
+            const id = await (await DatabaseManager.get()).setCredentials(x);
             return c.json({"id": id});
         } catch (e) {
             logger.error(e);

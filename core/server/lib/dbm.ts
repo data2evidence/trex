@@ -63,7 +63,7 @@ export class DatabaseManager {
         return r;
     }
 
-    public async addCredentials(c: any) {
+    public async setCredentials(c: any) {
         const v = new Validator();
         v.validate(c, dbSchema);
 
