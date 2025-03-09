@@ -31,9 +31,6 @@ jobs:
       - uses: actions/checkout@v4
       - run: rustup show
       - uses: Swatinem/rust-cache@v2
-      - name: Prebuild Workspace
-        run: cargo build --workspace --all-targets --all-features
-        continue-on-error: true
       - run: ./scripts/clippy.sh
 
   cargo-test:
