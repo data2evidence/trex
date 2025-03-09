@@ -28,8 +28,12 @@ jobs:
     name: "cargo clippy"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: rustup show
+      - uses: actions/checkout@v4        
+        with:
+          submodules: 'recursive' 
+      - run: |
+          git config --global --add safe.directory '*'
+          rustup show
       - uses: Swatinem/rust-cache@v2
       - run: ./scripts/clippy.sh
 
