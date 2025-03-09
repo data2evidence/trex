@@ -4767,9 +4767,8 @@ checksum = "b4ce301924b7887e9d637144fdade93f9dfff9b60981d4ac161db09720d39aa5"
 
 [[package]]
 name = "llama-cpp-2"
-version = "0.1.102"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a419bb48efa0f8389a82301f1f64e2874568a3fbf6f62f8ddab5324382b82768"
+version = "0.1.103"
+source = "git+https://github.com/utilityai/llama-cpp-rs/?tag=0.1.103#6ab83db8babbb92adc4b6a2244006c171f57326b"
 dependencies = [
  "enumflags2",
  "llama-cpp-sys-2",
@@ -4780,9 +4779,8 @@ dependencies = [
 
 [[package]]
 name = "llama-cpp-sys-2"
-version = "0.1.102"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0522f9894e22dd988dd2e34222bda7acba53a0dcce744ca6d8ddce905ba33a4e"
+version = "0.1.103"
+source = "git+https://github.com/utilityai/llama-cpp-rs/?tag=0.1.103#6ab83db8babbb92adc4b6a2244006c171f57326b"
 dependencies = [
  "bindgen",
  "cc",
