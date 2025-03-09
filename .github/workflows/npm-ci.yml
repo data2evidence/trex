@@ -47,10 +47,10 @@ jobs:
           repository: ${{ env.GIT_REPO_FULL_NAME }}
       - name: Install cargo strip
         run: cargo install cargo-strip
+      - name: Prebuild Workspace (Warm-up)
+        run: cargo build --profile release --workspace --all-targets --all-features
       - name: Build
         run: cargo build --profile release
-        env: 
-          LLAMA_CPP_SYS_NO_BUILD_INFO: 1
       - name: Cargo strip
         run: cargo strip
       - name: cp
