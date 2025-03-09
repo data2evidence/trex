@@ -49,6 +49,8 @@ jobs:
         run: cargo install cargo-strip
       - name: Build
         run: cargo build --profile release
+        env: 
+          LLAMA_CPP_SYS_NO_BUILD_INFO: 1
       - name: Cargo strip
         run: cargo strip
       - name: cp
