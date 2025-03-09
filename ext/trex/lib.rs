@@ -7,9 +7,7 @@ use std::process;
 use deno_core::error::AnyError;
 use deno_core::op2;
 use duckdb::arrow::record_batch::RecordBatch;
-use duckdb::{
-    params_from_iter, types::ToSqlOutput, types::Value, Connection, ToSql,
-};
+use duckdb::{params_from_iter, types::ToSqlOutput, types::Value, Connection, ToSql};
 use pgwire::tokio::process_socket;
 use serde::{Deserialize, Serialize};
 pub use sql::{
@@ -28,13 +26,13 @@ use std::io::Write;
 use anyhow::{bail, Context};
 use hf_hub::api::sync::ApiBuilder;
 use llama_cpp_2::context::params::LlamaContextParams;
+use llama_cpp_2::ggml_time_us;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::model::{AddBos, Special};
 use llama_cpp_2::sampling::LlamaSampler;
-use llama_cpp_2::ggml_time_us;
 
 use std::num::NonZeroU32;
 use std::pin::pin;
@@ -272,9 +270,12 @@ async fn op_prompt_next(
 
     let mut rx = resource.receiver.lock().unwrap();
     let next_chunk = rx.recv().await;
-    
+
     if next_chunk.is_none() {
-        state.borrow_mut().resource_table.take::<LlamaStreamResource>(rid)?;
+        state
+            .borrow_mut()
+            .resource_table
+            .take::<LlamaStreamResource>(rid)?;
     }
     Ok(next_chunk)
 }
@@ -378,10 +379,8 @@ fn run_llama_model(
 
     let mut decoder = encoding_rs::UTF_8.new_decoder();
 
-    let mut sampler = LlamaSampler::chain_simple([
-        LlamaSampler::dist(seed),
-        LlamaSampler::greedy(),
-    ]);
+    let mut sampler =
+        LlamaSampler::chain_simple([LlamaSampler::dist(seed), LlamaSampler::greedy()]);
 
     while n_cur <= n_len {
         {
