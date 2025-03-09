@@ -35,6 +35,8 @@ jobs:
           git config --global --add safe.directory '*'
           rustup show
       - uses: Swatinem/rust-cache@v2
+      - name: Clean Cargo build cache
+        run: cargo clean
       - run: ./scripts/clippy.sh
 
   cargo-test:
