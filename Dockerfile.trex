@@ -10,6 +10,7 @@ ARG FEATURES=cli/tracing
 
 ENV LLAMA_CPP_SYS_NO_BUILD_INFO=1
 ENV ZERO_AR_DATE=1
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
 #ENV DUCKDB_STATIC_BUILD=1
 
 RUN apt-get update && apt-get install -y binutils llvm-dev libclang-dev clang cmake
