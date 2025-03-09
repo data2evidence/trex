@@ -48,7 +48,8 @@ jobs:
       - name: Install cargo strip
         run: cargo install cargo-strip
       - name: Prebuild Workspace (Warm-up)
-        run: cargo build --profile release --workspace --all-targets --all-features
+        run: cargo build --profile release --workspace
+        continue-on-error: true
       - name: Build
         run: cargo build --profile release
       - name: Cargo strip

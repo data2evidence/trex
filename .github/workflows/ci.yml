@@ -33,6 +33,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Prebuild Workspace
         run: cargo build --workspace --all-targets --all-features
+        continue-on-error: true
       - run: ./scripts/clippy.sh
 
   cargo-test:
