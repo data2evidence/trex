@@ -8,7 +8,7 @@ use deno_core::error::AnyError;
 use deno_core::op2;
 use duckdb::arrow::record_batch::RecordBatch;
 use duckdb::{
-    params_from_iter, types::ToSqlOutput, types::Value, Connection, Result as dResult, ToSql,
+    params_from_iter, types::ToSqlOutput, types::Value, Connection, ToSql,
 };
 use pgwire::tokio::process_socket;
 use serde::{Deserialize, Serialize};
@@ -25,32 +25,23 @@ use tracing::warn;
 
 use std::io::Write;
 
-use anyhow::{anyhow, bail, Context};
-use clap::Parser;
+use anyhow::{bail, Context};
 use hf_hub::api::sync::ApiBuilder;
 use llama_cpp_2::context::params::LlamaContextParams;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
-use llama_cpp_2::model::params::kv_overrides::ParamOverrideValue;
 use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::model::{AddBos, Special};
 use llama_cpp_2::sampling::LlamaSampler;
-use llama_cpp_2::{ggml_time_us, send_logs_to_tracing, LogOptions};
+use llama_cpp_2::ggml_time_us;
 
-use std::ffi::CString;
 use std::num::NonZeroU32;
-use std::path::PathBuf;
 use std::pin::pin;
-use std::str::FromStr;
 
 use deno_core::{OpState, Resource, ResourceId};
-use futures::stream::Stream;
 use std::cell::RefCell;
-use std::pin::Pin;
 use std::rc::Rc;
-use std::task::Poll;
-use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 
 use crate::pipeline::{
@@ -267,6 +258,7 @@ fn op_prompt(
     Ok(state.resource_table.add(resource))
 }
 
+#[allow(clippy::await_holding_lock)]
 #[op2(async)]
 #[string]
 async fn op_prompt_next(
@@ -280,8 +272,9 @@ async fn op_prompt_next(
 
     let mut rx = resource.receiver.lock().unwrap();
     let next_chunk = rx.recv().await;
+    
     if next_chunk.is_none() {
-        state.borrow_mut().resource_table.close(rid)?;
+        state.borrow_mut().resource_table.take::<LlamaStreamResource>(rid)?;
     }
     Ok(next_chunk)
 }
@@ -304,9 +297,9 @@ fn run_llama_model(
     };
     let ctx_size: Option<NonZeroU32> = Some(NonZeroU32::new(max_tokens).unwrap());
     let n_len = max_tokens as i32;
-    let seed = Some(1234);
+    let seed = 1234;
 
-    let mut model_params = pin!(model_params);
+    let model_params = pin!(model_params);
 
     /*for (k, v) in &key_value_overrides {
         let k = CString::new(k.as_bytes()).with_context(|| format!("invalid key: {k}"))?;
@@ -386,7 +379,7 @@ fn run_llama_model(
     let mut decoder = encoding_rs::UTF_8.new_decoder();
 
     let mut sampler = LlamaSampler::chain_simple([
-        LlamaSampler::dist(seed.unwrap_or(1234)),
+        LlamaSampler::dist(seed),
         LlamaSampler::greedy(),
     ]);
 
@@ -440,7 +433,7 @@ fn run_llama_model(
     );
 
     println!("{}", ctx.timings());
-    return Ok(());
+    Ok(())
 }
 
 #[op2(fast)]
