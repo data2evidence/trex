@@ -21,7 +21,7 @@ const {
 export { op_add_replication, op_exit };
 
 export async function prompt(xprompt) {
-    const streamId = await op_prompt(xprompt, 2048);
+    const streamId = op_prompt(xprompt, 2048);
 
     return new ReadableStream({
         async start(controller) {

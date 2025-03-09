@@ -14,13 +14,13 @@ pub use sql::{
     auth::AuthType,
     duckdb::{TrexDuckDB, TrexDuckDBFactory},
 };
+use std::env;
 use std::process::Command;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::SystemTime;
 use std::{error::Error, time::Duration};
 use tokio::net::TcpListener;
 use tracing::warn;
-use std::env;
 
 use std::io::Write;
 
@@ -240,7 +240,7 @@ fn op_prompt(
     #[string] prompt: String,
     #[smi] max_tokens: u32,
 ) -> Result<ResourceId, anyhow::Error> {
-    let (sender, receiver) = mpsc::channel::<String>((max_tokens * 4) as usize);
+    let (sender, receiver) = mpsc::channel::<String>((max_tokens) as usize);
 
     tokio::spawn(async move {
         tokio::task::spawn_blocking(move || {
@@ -287,13 +287,13 @@ fn run_llama_model(
 ) -> Result<(), anyhow::Error> {
     let backend = LlamaBackend::init()?;
     let model_params = {
-        #[cfg(any(feature = "cuda", feature = "vulkan"))]
+        /*#[cfg(any(feature = "cuda", feature = "vulkan"))]
         if !disable_gpu {
             LlamaModelParams::default().with_n_gpu_layers(1000)
         } else {
             LlamaModelParams::default()
         }
-        #[cfg(not(any(feature = "cuda", feature = "vulkan")))]
+        #[cfg(not(any(feature = "cuda", feature = "vulkan")))]*/
         LlamaModelParams::default()
     };
     let ctx_size: Option<NonZeroU32> = Some(NonZeroU32::new(max_tokens).unwrap());
@@ -396,7 +396,7 @@ fn run_llama_model(
             }
             //print!("{output_string}");
             //std::io::stdout().flush()?;
-
+            std::thread::yield_now();
             batch.clear();
             batch.add(token, n_cur, &[0], true)?;
         }
