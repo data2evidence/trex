@@ -20,11 +20,11 @@ use std::time::SystemTime;
 use std::{error::Error, time::Duration};
 use tokio::net::TcpListener;
 use tracing::warn;
+use std::env;
 
 use std::io::Write;
 
 use anyhow::{bail, Context};
-use hf_hub::api::sync::ApiBuilder;
 use llama_cpp_2::context::params::LlamaContextParams;
 use llama_cpp_2::ggml_time_us;
 use llama_cpp_2::llama_backend::LlamaBackend;
@@ -307,19 +307,14 @@ fn run_llama_model(
         model_params.as_mut().append_kv_override(k.as_c_str(), *v);
     }*/
 
-    let model_path = ApiBuilder::new()
-        .with_progress(true)
-        .build()
-        .with_context(|| "unable to create huggingface api")?
-        .model(String::from("Qwen/Qwen2.5-Coder-7B-Instruct-GGUF"))
-        .get("qwen2.5-coder-7b-instruct-q4_k_m.gguf")
-        .with_context(|| "unable to download model")
-        .unwrap();
+    let model_path = match env::var("TREX_MODEL") {
+        Ok(val) => val.to_string(),
+        Err(_e) => "./data/plugins/node_modules/@data2evidence/chat/llm.gguf".to_string(),
+    };
 
     let model = LlamaModel::load_from_file(&backend, model_path, &model_params)
         .with_context(|| "unable to load model")?;
 
-    // initialize the context
     let ctx_params =
         LlamaContextParams::default().with_n_ctx(ctx_size.or(Some(NonZeroU32::new(2048).unwrap())));
 
@@ -355,20 +350,16 @@ fn run_llama_model(
     std::io::stderr().flush()?;
 
     // create a llama_batch with size 512
-    // we use this object to submit token data for decoding
     let mut batch = LlamaBatch::new(512, 1);
 
     let last_index: i32 = (tokens_list.len() - 1) as i32;
     for (i, token) in (0_i32..).zip(tokens_list.into_iter()) {
-        // llama_decode will output logits only for the last token of the prompt
         let is_last = i == last_index;
         batch.add(token, i, &[0], is_last)?;
     }
 
     ctx.decode(&mut batch)
         .with_context(|| "llama_decode() failed")?;
-
-    // main loop
 
     let mut n_cur = batch.n_tokens();
     let mut n_decode = 0;
@@ -399,8 +390,7 @@ fn run_llama_model(
             for chunk in output_string.chars().collect::<Vec<_>>().chunks(1024) {
                 let s: String = chunk.iter().collect();
                 if sender.blocking_send(s).is_err() {
-                    warn!("ERRROROROROROROROOROROROROROROORORORXX{output_string}");
-
+                    warn!("TREX Error: send llm result to deno");
                     break;
                 }
             }

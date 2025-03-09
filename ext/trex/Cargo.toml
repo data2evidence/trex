@@ -39,7 +39,6 @@ tokio-postgres = { git = "https://github.com/imor/rust-postgres", rev = "20265ef
 tracing = { workspace = true, default-features = true }
 uuid = { workspace = true, features = ["v4"] }
 llama-cpp-2 = "0.1.102"
-hf-hub = { version = "0.3.2" }
 clap = { version = "4.5.31", features = ["derive"] }
 anyhow = "1.0.97"
 encoding_rs = "0.8.33"

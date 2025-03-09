@@ -255,6 +255,6 @@ export function test() {
         runtest(key, value, 0);
     }
     for (const [key, value] of Object.entries(tests)) {
-        runtest(key, value, 2000);
+        runtest(key, value, 3000);
     }
 }
