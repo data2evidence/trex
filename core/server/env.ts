@@ -32,8 +32,8 @@ export const publicURLs = [
     '^/system-portal/config/public/overview-description$',
     '^/index.html$',
     '^/assets/.*$',
-    '^/api/*$',
-    '^/oidc/*$',
+    '^/api/.*$',
+    '^/oidc/.*$',
     '^/sign-in$',
     '^/consent$',
     '^/callback$'
