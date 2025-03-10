@@ -305,8 +305,8 @@ export async function authz(c: Context, next: any) {
       //logger.info(`🚀 inside au, req.headers: ${JSON.stringify(c.req.headers)}`)
     }
 
-    if(!requireDatasetId(mriUserObj.studyScopes)) {
-      return next();
+    if(!requireDatasetId(scopes)) {
+      next()
     }
     let datasetId: string | null = null;
     const datasetIdKey = match["datasetId"] ?? "datasetId"
@@ -337,10 +337,10 @@ function hasRequiredScopes(reqScopes: string[], userScopes: string[]) {
   return reqScopes.every(scope => userScopes.includes(scope))
 }
 
-function requireDatasetId(studyScopes: string[]): boolean {
-  // TODO: following condition may change, what is the base condition to identify the request as dataset specific
-  // One way is to add a flag to the endpoint definition in package.json
-  return studyScopes.length > 0
+function requireDatasetId(scopes: string[]): boolean {
+  const roleScopesMap: Map<string, string[]> = new Map(Object.entries(global.ROLE_SCOPES))
+  const researcherScopes = roleScopesMap.get(ROLES.STUDY_RESEARCHER)
+  return scopes.some(s => researcherScopes?.includes(s))
 }
 
 const _lookForDatasetIdInBody = async (
