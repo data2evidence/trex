@@ -297,7 +297,7 @@ export async function authz(c: Context, next: any) {
     if(!hasRequiredScopes(scopes, assignedScopes)) {
       logger.info(`inside authz: Forbidden, token does not have required scope`)
       logger.debug(`inside authz: Forbidden url: ${originalUrl} scope: ${JSON.stringify(match)} user: ${JSON.stringify(mriUserObj)}`)
-      throw new HTTPException(403, { res: new Response('Forbidden', {status: 403 })})  
+      throw new HTTPException(401, { res: new Response('Forbidden', {status: 401 })})  
     }
 
     logger.info(`AUTHORIZED ACCESS: user ${mriUserObj.userId}, url ${originalUrl}`)
@@ -328,7 +328,7 @@ export async function authz(c: Context, next: any) {
       return next()
     } else {
       logger.error(`datasetId check: No Access to datasetId ${datasetId}`)
-      throw new HTTPException(403, { res: new Response('Unauthorized access to dataset', {status: 403 })})
+      throw new HTTPException(401, { res: new Response('Unauthorized access to dataset', {status: 401 })})
     }
   }
 }
