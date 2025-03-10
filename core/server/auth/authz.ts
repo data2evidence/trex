@@ -252,7 +252,7 @@ export async function authz(c: Context, next: any) {
       return next()
     } else if (!bearerToken) {
       logger.error(`No bearer token is found for url: ${originalUrl}`)
-      throw new HTTPException(401, { res: new Response('Unauthorized', {status: 401 })})
+      throw new HTTPException(403, { res: new Response('Unauthorized', {status: 403 })})
     }
 
     const token = jwt.decode(bearerToken.replace(/bearer /i, '')) //as IToken
@@ -328,7 +328,7 @@ export async function authz(c: Context, next: any) {
       return next()
     } else {
       logger.error(`datasetId check: No Access to datasetId ${datasetId}`)
-      throw new HTTPException(401, { res: new Response('Unauthorized access to dataset', {status: 401 })})
+      throw new HTTPException(403, { res: new Response('Unauthorized access to dataset', {status: 403 })})
     }
   }
 }
