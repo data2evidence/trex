@@ -306,7 +306,7 @@ export async function authz(c: Context, next: any) {
     }
 
     if(!requireDatasetId(mriUserObj.studyScopes)) {
-      next()
+      return next();
     }
     let datasetId: string | null = null;
     const datasetIdKey = match["datasetId"] ?? "datasetId"
