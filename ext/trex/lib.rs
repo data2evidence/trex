@@ -35,9 +35,9 @@ use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::model::{AddBos, Special};
 use llama_cpp_2::sampling::LlamaSampler;
 
+use std::fs;
 use std::num::NonZeroU32;
 use std::pin::pin;
-use std::fs;
 
 use deno_core::{OpState, Resource, ResourceId};
 use std::cell::RefCell;
@@ -286,13 +286,8 @@ async fn op_prompt_next(
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 enum Model {
-    Local {
-        path: String,
-    },
-    HuggingFace {
-        repo: String,
-        model: String,
-    },
+    Local { path: String },
+    HuggingFace { repo: String, model: String },
     None,
 }
 
@@ -324,7 +319,6 @@ fn run_llama_model(
         model_params.as_mut().append_kv_override(k.as_c_str(), *v);
     }*/
 
-
     let model_path: String = match model {
         Model::Local { path } => path,
         Model::HuggingFace { model, repo } => ApiBuilder::new()
@@ -341,12 +335,15 @@ fn run_llama_model(
         Model::None => match env::var("TREX_MODEL") {
             Ok(val) => val,
             Err(_e) => "./data/plugins/node_modules/@data2evidence/chat/llm.gguf".to_string(),
-        }
+        },
     };
 
     if !fs::metadata(&model_path).is_ok() {
         eprintln!("Model file does not exist at path: {}", model_path);
-        return Err(anyhow::anyhow!("Model file does not exist at path: {}", model_path));
+        return Err(anyhow::anyhow!(
+            "Model file does not exist at path: {}",
+            model_path
+        ));
     }
 
     let model = match LlamaModel::load_from_file(&backend, model_path, &model_params) {
