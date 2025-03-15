@@ -330,7 +330,6 @@ fn run_llama_model(
             .with_context(|| "unable to download model")?
             .into_os_string()
             .into_string()
-            .ok()
             .expect("Not UTF-8 String"),
         Model::None => match env::var("TREX_MODEL") {
             Ok(val) => val,
@@ -338,7 +337,7 @@ fn run_llama_model(
         },
     };
 
-    if !fs::metadata(&model_path).is_ok() {
+    if fs::metadata(&model_path).is_err() {
         eprintln!("Model file does not exist at path: {}", model_path);
         return Err(anyhow::anyhow!(
             "Model file does not exist at path: {}",
