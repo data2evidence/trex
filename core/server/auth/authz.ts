@@ -244,7 +244,7 @@ export async function authz(c: Context, next: any) {
   } else {
 
     const userMgmtApi = new UserMgmtAPI()
-    const { url, method } = c.req.raw
+    const { method } = c.req.raw
     const originalUrl = c.req.path
 
     const bearerToken = c.req.raw.headers.get('authorization')
@@ -252,7 +252,7 @@ export async function authz(c: Context, next: any) {
       return next()
     } else if (!bearerToken) {
       logger.error(`No bearer token is found for url: ${originalUrl}`)
-      throw new HTTPException(403, { res: new Response('Unauthorized', {status: 403 })})
+      throw new HTTPException(401, { res: new Response('Unauthorized', {status: 401 })})
     }
 
     const token = jwt.decode(bearerToken.replace(/bearer /i, '')) //as IToken
@@ -270,7 +270,7 @@ export async function authz(c: Context, next: any) {
       // return response 404 (resource not found)
       throw new HTTPException(404, { res: new Response('Not found', {status: 404 })})  
     }
-  
+
     if (isClientCredToken(token)) {
       mriUserObj = new MriUser(token, global.ROLE_SCOPES).adUserObject
     } else {
@@ -283,6 +283,7 @@ export async function authz(c: Context, next: any) {
         throw new HTTPException(500, { res: new Response('Error', {status: 500 })})
       }
     }
+
 
     /*const userScopes = await getUserScopes(bearerToken, originalUrl)
     if (scopes.some(i => userScopes.includes(i))) {
@@ -305,19 +306,12 @@ export async function authz(c: Context, next: any) {
       //logger.info(`🚀 inside au, req.headers: ${JSON.stringify(c.req.headers)}`)
     }
 
-    if(!requireDatasetId(scopes)) {
-      next()
+    if(!requireDatasetId(mriUserObj.studyScopes)) {
+      return next();
     }
-    let datasetId: string | null = null;
     const datasetIdKey = match["datasetId"] ?? "datasetId"
     // Look for datasetId in query param
-    datasetId = c.req.query(datasetIdKey);
-
-    // Look for datasetId in body if not found in query parameter
-    if (!datasetId) {
-      datasetId = await _lookForDatasetIdInBody(c, datasetIdKey)
-    }
-
+    const datasetId = await extractDatasetIdFromRequestContext(c, datasetIdKey);
     if(!datasetId) {
       logger.error(`\x1b[0m\x1b[41m>>> NO datasetId defined in scope @ ${c.req.method} ${c.req.path}<<<\x1b[0m`)
       throw new HTTPException(403, { res: new Response('Dataset id is missing in the request', {status: 403 })})
@@ -333,14 +327,33 @@ export async function authz(c: Context, next: any) {
   }
 }
 
-function hasRequiredScopes(reqScopes: string[], userScopes: string[]) {
-  return reqScopes.every(scope => userScopes.includes(scope))
-}
+/*
+Look for datasetId in the following order
+  1. Request query parameter
+  2. Request body
+  3. Request header
+If datasetId is not found, return null
+*/
+const extractDatasetIdFromRequestContext = async (
+  c,
+  datasetIdKey: string
+): Promise<string | null> => {
+  let datasetId: string | null = null;
 
-function requireDatasetId(scopes: string[]): boolean {
-  const roleScopesMap: Map<string, string[]> = new Map(Object.entries(global.ROLE_SCOPES))
-  const researcherScopes = roleScopesMap.get(ROLES.STUDY_RESEARCHER)
-  return scopes.some(s => researcherScopes?.includes(s))
+  // Look for datasetId in query param
+  datasetId = c.req.query(datasetIdKey);
+
+  // Look for datasetId in body if not found in query parameter
+  if (!datasetId) {
+    datasetId = await _lookForDatasetIdInBody(c, datasetIdKey)
+  }
+
+  // Look for datasetId in header if not found in query parameter or body
+  if (!datasetId) {
+    datasetId = c.req.header(datasetIdKey)
+  }
+
+  return datasetId;
 }
 
 const _lookForDatasetIdInBody = async (
@@ -364,3 +377,13 @@ const _lookForDatasetIdInBody = async (
   }
   return datasetId;
 };
+
+function hasRequiredScopes(reqScopes: string[], userScopes: string[]) {
+  return reqScopes.every(scope => userScopes.includes(scope))
+}
+
+function requireDatasetId(scopes: string[]): boolean {
+  const roleScopesMap: Map<string, string[]> = new Map(Object.entries(global.ROLE_SCOPES))
+  const researcherScopes = roleScopesMap.get(ROLES.STUDY_RESEARCHER)
+  return scopes.some(s => researcherScopes?.includes(s))
+}
