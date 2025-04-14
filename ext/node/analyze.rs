@@ -154,7 +154,8 @@ impl<TCjsCodeAnalyzer: CjsCodeAnalyzer> NodeCodeTranslator<TCjsCodeAnalyzer> {
         let translated_source = source.join("\n");
         Ok(translated_source)
     }
-
+    
+    #[allow(clippy::needless_lifetimes)]
     async fn analyze_reexports<'a>(
         &'a self,
         entry_specifier: &url::Url,
