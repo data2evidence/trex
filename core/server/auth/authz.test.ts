@@ -414,7 +414,11 @@ Deno.test({
       req: {
         path: "/trex/plugins/test",
         header: (name: string) => {
-          return { Authorization: `Bearer ${token}` }[name] || null;
+          return (
+            { Authorization: `Bearer ${token}`, datasetId: "dataset-1" }[
+              name
+            ] || null
+          );
         },
         query: (name: string) => undefined,
         raw: {
