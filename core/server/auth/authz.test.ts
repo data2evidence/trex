@@ -116,9 +116,9 @@ Object.defineProperty(global, "REQUIRED_URL_SCOPES", {
   configurable: true,
 });
 
-Deno.test(
-  "isClientCredToken - should return true for client credentials token",
-  () => {
+Deno.test({
+  name: "isClientCredToken - should return true for client credentials token",
+  fn: () => {
     const token: IAppTokenPayload = {
       authType: "azure-ad",
       sub: "test-client",
@@ -133,12 +133,12 @@ Deno.test(
     } as IAppTokenPayload;
 
     assertEquals(isClientCredToken(token), true);
-  }
-);
+  },
+});
 
-Deno.test(
-  "isClientCredToken - should return false for non-client credentials token",
-  () => {
+Deno.test({
+  name: "isClientCredToken - should return false for non-client credentials token",
+  fn: () => {
     const token: IAppTokenPayload = {
       sub: "test-user",
       email: "test@example.com",
@@ -153,12 +153,12 @@ Deno.test(
     } as IAppTokenPayload;
 
     assertEquals(isClientCredToken(token), false);
-  }
-);
+  },
+});
 
-Deno.test(
-  "MriUser - should create B2C user with correct roles and scopes",
-  () => {
+Deno.test({
+  name: "MriUser - should create B2C user with correct roles and scopes",
+  fn: () => {
     const token: IAppTokenPayload = {
       sub: "test-user",
       name: "Test User",
@@ -193,83 +193,67 @@ Deno.test(
 
     // Test study researcher scopes
     assertEquals(b2cUser.studyScopes.includes("PA.svc"), true);
-  }
-);
-
-Deno.test("MriUser - should create AD user for client credentials", () => {
-  const token: IAppTokenPayload = {
-    authType: "azure-ad",
-    sub: "test-client",
-    tid: "tenant-1",
-    roles: ["trex", "portal.dataset.systemAdmin.read", "portal.tenant.read"],
-    email: "test@example.com",
-    userMgmtGroups: {
-      groups: [],
-      alp_tenant_id: ["tenant-1"],
-      alp_role_tenant_viewer: [],
-      alp_role_study_researcher: [],
-      alp_role_system_admin: false,
-    },
-  } as IAppTokenPayload;
-
-  const user = new MriUser(token, global.ROLE_SCOPES);
-  const adUser = user.adUserObject;
-
-  assertEquals(adUser.userId, "test-client");
-  assertEquals(adUser.tenantId, ["tenant-1"]);
-  assertEquals(adUser.mriScopes.includes("trex"), true);
-  assertEquals(
-    adUser.mriScopes.includes("portal.dataset.systemAdmin.read"),
-    true
-  );
-  assertEquals(adUser.mriScopes.includes("portal.tenant.read"), true);
-  assertEquals(user.isClientCredUser, true);
+  },
 });
 
-Deno.test("MriUser - should throw error for invalid token", () => {
-  const token: IAppTokenPayload = {
-    sub: "test-user",
-    email: "test@example.com",
-    userMgmtGroups: null as any,
-  } as IAppTokenPayload;
+Deno.test({
+  name: "MriUser - should create AD user for client credentials",
+  fn: () => {
+    const token: IAppTokenPayload = {
+      authType: "azure-ad",
+      sub: "test-client",
+      tid: "tenant-1",
+      roles: ["trex", "portal.dataset.systemAdmin.read", "portal.tenant.read"],
+      email: "test@example.com",
+      userMgmtGroups: {
+        groups: [],
+        alp_tenant_id: ["tenant-1"],
+        alp_role_tenant_viewer: [],
+        alp_role_study_researcher: [],
+        alp_role_system_admin: false,
+      },
+    } as IAppTokenPayload;
 
-  assertThrows(
-    () => new MriUser(token, global.ROLE_SCOPES),
-    Error,
-    "token has no userMgmtGroups"
-  );
+    const user = new MriUser(token, global.ROLE_SCOPES);
+    const adUser = user.adUserObject;
+
+    assertEquals(adUser.userId, "test-client");
+    assertEquals(adUser.tenantId, ["tenant-1"]);
+    assertEquals(adUser.mriScopes.includes("trex"), true);
+    assertEquals(
+      adUser.mriScopes.includes("portal.dataset.systemAdmin.read"),
+      true
+    );
+    assertEquals(adUser.mriScopes.includes("portal.tenant.read"), true);
+    assertEquals(user.isClientCredUser, true);
+  },
+});
+
+Deno.test({
+  name: "MriUser - should throw error for invalid token",
+  fn: () => {
+    const token: IAppTokenPayload = {
+      sub: "test-user",
+      email: "test@example.com",
+      userMgmtGroups: null as any,
+    } as IAppTokenPayload;
+
+    assertThrows(
+      () => new MriUser(token, global.ROLE_SCOPES),
+      Error,
+      "token has no userMgmtGroups"
+    );
+  },
 });
 
 /*** START OF TESTS ***/
 
-Deno.test("authz - should handle public URLs", async () => {
-  const mockContext = {
-    req: {
-      path: "/system-portal/dataset/public/list",
-      header: (name: string) => (name === "Authorization" ? undefined : null),
-      query: (name: string) => undefined,
-      raw: {
-        headers: new Headers(),
-      },
-    },
-    get: (name: string) => undefined,
-  } as unknown as Context;
-
-  let nextCalled = false;
-  const next = () => {
-    nextCalled = true;
-  };
-
-  await authz(mockContext, next);
-  assertEquals(nextCalled, true);
-});
-
-Deno.test("authz - should reject requests without token", async () => {
-  try {
-    // Create a mock context without a token
+Deno.test({
+  name: "authz - should handle public URLs",
+  fn: async () => {
     const mockContext = {
       req: {
-        path: "/trex/plugins/test", // Using an actual protected endpoint
+        path: "/system-portal/dataset/public/list",
         header: (name: string) => (name === "Authorization" ? undefined : null),
         query: (name: string) => undefined,
         raw: {
@@ -279,31 +263,60 @@ Deno.test("authz - should reject requests without token", async () => {
       get: (name: string) => undefined,
     } as unknown as Context;
 
-    const next = () => {};
+    let nextCalled = false;
+    const next = () => {
+      nextCalled = true;
+    };
 
-    let error;
-    try {
-      await authz(mockContext, next);
-    } catch (e) {
-      error = e;
-    }
-
-    assertExists(error);
-    assertEquals(error instanceof HTTPException, true);
-    assertEquals(error.status, 401);
-  } finally {
-    // Restore original UserMgmtAPI
-    Object.defineProperty(globalThis, "UserMgmtAPI", {
-      value: OriginalUserMgmtAPI,
-      writable: true,
-      configurable: true,
-    });
-  }
+    await authz(mockContext, next);
+    assertEquals(nextCalled, true);
+  },
 });
 
-Deno.test(
-  "authz - should handle requests with valid token and required scopes",
-  async () => {
+Deno.test({
+  name: "authz - should reject requests without token",
+  fn: async () => {
+    try {
+      // Create a mock context without a token
+      const mockContext = {
+        req: {
+          path: "/trex/plugins/test", // Using an actual protected endpoint
+          header: (name: string) =>
+            name === "Authorization" ? undefined : null,
+          query: (name: string) => undefined,
+          raw: {
+            headers: new Headers(),
+          },
+        },
+        get: (name: string) => undefined,
+      } as unknown as Context;
+
+      const next = () => {};
+
+      let error;
+      try {
+        await authz(mockContext, next);
+      } catch (e) {
+        error = e;
+      }
+
+      assertExists(error);
+      assertEquals(error instanceof HTTPException, true);
+      assertEquals(error.status, 401);
+    } finally {
+      // Restore original UserMgmtAPI
+      Object.defineProperty(globalThis, "UserMgmtAPI", {
+        value: OriginalUserMgmtAPI,
+        writable: true,
+        configurable: true,
+      });
+    }
+  },
+});
+
+Deno.test({
+  name: "authz - should handle requests with valid token and required scopes",
+  fn: async () => {
     const token = createMockToken({
       userMgmtGroups: {
         groups: ["trex"],
@@ -339,8 +352,8 @@ Deno.test(
 
     await authz(mockContext, next);
     assertEquals(nextCalled, true);
-  }
-);
+  },
+});
 
 Deno.test({
   name: "authz - should reject requests with insufficient scopes",
