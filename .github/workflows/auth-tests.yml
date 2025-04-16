@@ -1,21 +1,18 @@
 name: Run Authorization Tests
 
 on:
-  push:
-    branches: [ main, develop ]
-    paths:
-      - 'core/server/auth/**'
+  workflow_dispatch: # Allow manual triggering
   pull_request:
-    branches: [ main, develop ]
-    paths:
-      - 'core/server/auth/**'
-  workflow_dispatch:  # Allow manual triggering
+    types: [opened, ready_for_review, reopened, synchronize]
+  push:
+    branches:
+      - develop
 
 jobs:
   test:
     name: Run Authorization Tests
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,7 +20,7 @@ jobs:
       - name: Setup Deno
         uses: denoland/setup-deno@v1
         with:
-          deno-version: v1.x  # Use the latest stable version
+          deno-version: v1.x # Use the latest stable version
 
       - name: Run Authorization Tests
         run: deno test --no-check --allow-env ./core/server/auth/authz.test.ts
