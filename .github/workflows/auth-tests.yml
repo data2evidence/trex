@@ -20,7 +20,7 @@ jobs:
       - name: Setup Deno
         uses: denoland/setup-deno@v1
         with:
-          deno-version: v1.x # Use the latest stable version
+          deno-version: v1.43.1
 
       - name: Run Authorization Tests
         run: deno test --no-check --allow-env ./core/server/auth/authz.test.ts
