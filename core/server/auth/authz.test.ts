@@ -39,7 +39,7 @@ Object.defineProperty(axios, "post", {
           groups: ["group1", "group2"],
           alp_tenant_id: ["tenant-1"],
           alp_role_tenant_viewer: ["tenant-1"],
-          alp_role_study_researcher: ["study-1"],
+          alp_role_study_researcher: ["dataset-1"],
           alp_role_system_admin: true,
           alp_role_user_admin: true,
           alp_role_nifi_admin: true,
@@ -63,7 +63,7 @@ const createMockToken = (payload: Partial<IAppTokenPayload>) => {
       groups: [],
       alp_tenant_id: ["tenant-1"],
       alp_role_tenant_viewer: ["tenant-1"],
-      alp_role_study_researcher: ["study-1"],
+      alp_role_study_researcher: ["dataset-1"],
       alp_role_system_admin: true,
       alp_role_user_admin: true,
       alp_role_nifi_admin: true,
@@ -83,7 +83,7 @@ const mockUserMgmtAPI = {
       groups: ["group1", "group2"],
       alp_tenant_id: ["tenant-1"],
       alp_role_tenant_viewer: ["tenant-1"],
-      alp_role_study_researcher: ["study-1"],
+      alp_role_study_researcher: ["dataset-1"],
       alp_role_system_admin: true,
     };
   },
@@ -167,7 +167,7 @@ Deno.test({
         groups: ["trex"],
         alp_tenant_id: ["tenant-1"],
         alp_role_tenant_viewer: ["tenant-1"],
-        alp_role_study_researcher: ["study-1"],
+        alp_role_study_researcher: ["dataset-1"],
         alp_role_system_admin: true,
         alp_role_user_admin: true,
         alp_role_nifi_admin: true,
@@ -254,7 +254,9 @@ Deno.test({
     const mockContext = {
       req: {
         path: "/system-portal/dataset/public/list",
-        header: (name: string) => (name === "Authorization" ? undefined : null),
+        header: (name: string) => {
+          return { Authorization: undefined }[name] || null;
+        },
         query: (name: string) => undefined,
         raw: {
           headers: new Headers(),
@@ -281,8 +283,9 @@ Deno.test({
       const mockContext = {
         req: {
           path: "/trex/plugins/test", // Using an actual protected endpoint
-          header: (name: string) =>
-            name === "Authorization" ? undefined : null,
+          header: (name: string) => {
+            return { Authorization: undefined }[name] || null;
+          },
           query: (name: string) => undefined,
           raw: {
             headers: new Headers(),
@@ -322,7 +325,7 @@ Deno.test({
         groups: ["trex"],
         alp_tenant_id: ["tenant-1"],
         alp_role_tenant_viewer: [],
-        alp_role_study_researcher: [],
+        alp_role_study_researcher: ["dataset-1", "dataset-1"], // Ensure dataset-1 is included
         alp_role_system_admin: true,
         alp_role_user_admin: false,
         alp_role_nifi_admin: false,
@@ -333,9 +336,12 @@ Deno.test({
     const mockContext = {
       req: {
         path: "/trex/plugins/test", // Using an actual endpoint that requires 'trex' scope
-        header: (name: string) =>
-          name === "Authorization" ? `Bearer ${token}` : null,
-        query: (name: string) => undefined,
+        header: (name: string) => {
+          return { Authorization: `Bearer ${token}` }[name] || null;
+        },
+        query: (name: string) => {
+          return { datasetId: "dataset-1" }[name];
+        },
         raw: {
           headers: new Headers({
             Authorization: `Bearer ${token}`,
@@ -363,7 +369,9 @@ Deno.test({
     const mockContext = {
       req: {
         path: "/trex/plugins/test", // This endpoint requires 'trex' scope
-        header: (name: string) => (name === "Authorization" ? undefined : null),
+        header: (name: string) => {
+          return { Authorization: undefined }[name] || null;
+        },
         query: (name: string) => undefined,
         raw: {
           headers: new Headers({}),
@@ -405,8 +413,9 @@ Deno.test({
     const mockContext = {
       req: {
         path: "/trex/plugins/test",
-        header: (name: string) =>
-          name === "Authorization" ? `Bearer ${token}` : null,
+        header: (name: string) => {
+          return { Authorization: `Bearer ${token}` }[name] || null;
+        },
         query: (name: string) => undefined,
         raw: {
           headers: new Headers({
