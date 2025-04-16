@@ -24,6 +24,3 @@ jobs:
 
       - name: Run Authorization Tests
         run: deno test --no-check --allow-env ./core/server/auth/authz.test.ts
-        env:
-          # Add any environment variables needed for tests here
-          NODE_ENV: test

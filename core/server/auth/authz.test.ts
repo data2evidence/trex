@@ -246,11 +246,14 @@ Deno.test("authz - should handle public URLs", async () => {
   const mockContext = {
     req: {
       path: "/system-portal/dataset/public/list",
+      header: (name: string) => (name === "Authorization" ? undefined : null),
+      query: (name: string) => undefined,
       raw: {
         headers: new Headers(),
       },
     },
-  } as Context;
+    get: (name: string) => undefined,
+  } as unknown as Context;
 
   let nextCalled = false;
   const next = () => {
@@ -267,11 +270,14 @@ Deno.test("authz - should reject requests without token", async () => {
     const mockContext = {
       req: {
         path: "/trex/plugins/test", // Using an actual protected endpoint
+        header: (name: string) => (name === "Authorization" ? undefined : null),
+        query: (name: string) => undefined,
         raw: {
           headers: new Headers(),
         },
       },
-    } as Context;
+      get: (name: string) => undefined,
+    } as unknown as Context;
 
     const next = () => {};
 
@@ -314,13 +320,17 @@ Deno.test(
     const mockContext = {
       req: {
         path: "/trex/plugins/test", // Using an actual endpoint that requires 'trex' scope
+        header: (name: string) =>
+          name === "Authorization" ? `Bearer ${token}` : null,
+        query: (name: string) => undefined,
         raw: {
           headers: new Headers({
             Authorization: `Bearer ${token}`,
           }),
         },
       },
-    } as Context;
+      get: (name: string) => undefined,
+    } as unknown as Context;
 
     let nextCalled = false;
     const next = () => {
@@ -340,11 +350,14 @@ Deno.test({
     const mockContext = {
       req: {
         path: "/trex/plugins/test", // This endpoint requires 'trex' scope
+        header: (name: string) => (name === "Authorization" ? undefined : null),
+        query: (name: string) => undefined,
         raw: {
           headers: new Headers({}),
         },
       },
-    } as Context;
+      get: (name: string) => undefined,
+    } as unknown as Context;
 
     const next = () => {};
     let error;
@@ -360,8 +373,6 @@ Deno.test({
   },
 });
 
-// This test is redundant with "authz - should handle requests with valid token and required scopes"
-// as both test the same scenario with a system admin role
 Deno.test({
   name: "authz - should handle requests with valid system admin role",
   fn: async () => {
@@ -381,13 +392,17 @@ Deno.test({
     const mockContext = {
       req: {
         path: "/trex/plugins/test",
+        header: (name: string) =>
+          name === "Authorization" ? `Bearer ${token}` : null,
+        query: (name: string) => undefined,
         raw: {
           headers: new Headers({
             Authorization: `Bearer ${token}`,
           }),
         },
       },
-    } as Context;
+      get: (name: string) => undefined,
+    } as unknown as Context;
 
     let nextCalled = false;
     const next = () => {
