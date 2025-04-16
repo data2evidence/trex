@@ -16,6 +16,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Show current commit for verification
+        run: |
+          echo "Testing commit:"
+          git rev-parse HEAD
+          git log -1 --format="%an: %s"
 
       - name: Setup Deno
         uses: denoland/setup-deno@v1
