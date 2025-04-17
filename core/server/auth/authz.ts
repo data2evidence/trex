@@ -26,10 +26,8 @@ export const ROLES = {
 }
 
 export type IAppTokenPayload = ITokenPayload & {
-  given_name: string
-  family_name: string
-  extension_termsOfUseConsentVersion: string
-  email: string
+  sub: string
+  client_id: string
   userMgmtGroups: IUserMgmtGroups
 }
 
@@ -67,42 +65,17 @@ interface IUser {
 
 
 export function isClientCredToken(token: IAppTokenPayload) {
-  return token.authType && token.authType === 'azure-ad'
+  return token.sub === token.client_id
 }
-
-const buildADUserFromToken = (token: IAppTokenPayload): IUser => {
-  const { tid, sub, roles } = token
-  const mriScopes: string[] = []
-  mriScopes.push(...roles!)
-  const user: IUser = {
-    userId: sub,
-    tenantId: [tid!],
-    mriRoles: [],
-    mriScopes,
-    studyScopes: mriScopes,
-    alpRoleMap: {
-      TENANT_VIEWER_ROLE: [],
-      STUDY_RESEARCHER_ROLE: []
-    },
-    roles,
-    groups: [],
-    adGroups: []
-  }
-
-  return user
-}
-
 
 const buildUserFromToken = (token: IAppTokenPayload, ROLE_SCOPES: any): IUser => {
-  const { client_id, grant_type, name, sub, email, userMgmtGroups, groups: adGroups } = token
-
-  if (typeof userMgmtGroups.alp_tenant_id === 'undefined' || userMgmtGroups.alp_tenant_id.length === 0) {
-    logger.error(`SECURITY INCIDENT: User does not belong to a tenant ${JSON.stringify(token)}`)
-    //throw new Error('User does not belong to a tenant')
-  }
+  const { sub } = token
+  let { userMgmtGroups } = token
   const roles: string[] = []
 
-  if (grant_type === 'client_credentials' || sub === client_id) {
+  if (isClientCredToken(token)) {
+    // Create empty object to avoid error after the else block
+    userMgmtGroups = {}
     roles.push(sub)
   } else {
     if (userMgmtGroups.alp_role_user_admin === true) {
@@ -162,8 +135,6 @@ const buildUserFromToken = (token: IAppTokenPayload, ROLE_SCOPES: any): IUser =>
 
   const user: IUser = {
     userId: sub,
-    name,
-    email,
     tenantId: userMgmtGroups.alp_tenant_id,
     mriRoles,
     mriScopes,
@@ -173,7 +144,6 @@ const buildUserFromToken = (token: IAppTokenPayload, ROLE_SCOPES: any): IUser =>
     },
     roles,
     groups: typeof userMgmtGroups.groups === 'string' ? [userMgmtGroups.groups] : userMgmtGroups.groups,
-    adGroups: typeof adGroups === 'string' ? [adGroups] : adGroups
   }
 
   return user
@@ -182,31 +152,23 @@ const buildUserFromToken = (token: IAppTokenPayload, ROLE_SCOPES: any): IUser =>
 
 export class MriUser {
   private b2cUser: IUser
-  private adUser: IUser
-  private isAlice = false
   private isClientCredReqUser = false
 
   constructor(private token: IAppTokenPayload | string, ROLE_SCOPES: any, private userLang: string = 'en') {
-    if (typeof token === 'string') {
-      this.isAlice = true
-      return
-    }
-    if (isClientCredToken(token)) {
-      this.isClientCredReqUser = true
-      this.adUser = buildADUserFromToken(token)
-      return
-    }
-
     const { sub, userMgmtGroups } = token
 
     if (!sub) {
       throw new Error('token has no sub')
     } else if (!userMgmtGroups) {
-      throw new Error('token has no userMgmtGroups')
+      if (!isClientCredToken(token))
+      {
+        // Expecting userMgmtGroups for non client-credentials token
+        throw new Error('token has no userMgmtGroups')
+      }
     }
 
+    this.isClientCredReqUser = isClientCredToken(token)
     this.b2cUser = buildUserFromToken(token, ROLE_SCOPES)
-
     this.userLang = userLang.split('-')[0]
   }
 
@@ -215,13 +177,6 @@ export class MriUser {
       throw new Error('User is not configured')
     }
     return this.b2cUser
-  }
-
-  get adUserObject(): IUser {
-    if (!this.adUser) {
-      throw new Error('User is not configured')
-    }
-    return this.adUser
   }
 
   get isClientCredUser(): boolean {
@@ -268,7 +223,7 @@ export async function authz(c: Context, next: any) {
     }
 
     if (isClientCredToken(token)) {
-      mriUserObj = new MriUser(token, global.ROLE_SCOPES).adUserObject
+      mriUserObj = new MriUser(token, global.ROLE_SCOPES).b2cUserObject
     } else {
       try {
         const userGroups = await userMgmtApi.getUserGroups(c.req.raw.headers.get('authorization'), idpUserId)
