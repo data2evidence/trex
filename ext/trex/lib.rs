@@ -562,11 +562,13 @@ fn op_execute_query(
         }
 
     }*/
-    match tmpstmt  {
+    match tmpstmt {
         Ok(mut stmt) => {
-            let tmp = stmt.query_arrow(params_from_iter(params.iter())).inspect_err(|e| println!("{e}"));
+            let tmp = stmt
+                .query_arrow(params_from_iter(params.iter()))
+                .inspect_err(|e| println!("{e}"));
             match tmp {
-                Ok(tmp2)=> {
+                Ok(tmp2) => {
                     let rows: Vec<RecordBatch> = tmp2.collect();
                     let buffer = Vec::new();
                     let mut writer = arrow_json::ArrayWriter::new(buffer);
@@ -576,21 +578,14 @@ fn op_execute_query(
                     writer.finish().unwrap();
                     let buffer = writer.into_inner();
                     let s = String::from_utf8(buffer).unwrap();
-            
+
                     //warn!(s);
-                    return Ok(s)
+                    return Ok(s);
                 }
-                _ => {
-                    return Ok("{\"error\": \"TREX SQL Error\"}".to_string())
-
-                }
+                _ => return Ok("{\"error\": \"TREX SQL Error\"}".to_string()),
             }
-            
         }
-        _ => {
-            return Ok("{\"error\": \"TREX SQL Prepare Stmt Error\"}".to_string())
-        }
-
+        _ => return Ok("{\"error\": \"TREX SQL Prepare Stmt Error\"}".to_string()),
     }
 }
 
