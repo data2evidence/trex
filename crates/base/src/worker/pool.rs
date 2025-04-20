@@ -244,7 +244,6 @@ impl WorkerPool {
         }
     }
 
-    #[allow(clippy::unnecessary_map_or)]
     pub fn create_user_worker(
         &mut self,
         mut worker_options: WorkerContextInitOpts,
