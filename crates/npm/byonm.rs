@@ -207,6 +207,7 @@ impl NpmResolver for ByonmCliNpmResolver {
                 .contains("/node_modules/")
     }
 
+    #[allow(clippy::manual_ignore_case_cmp)]
     fn ensure_read_permission(
         &self,
         permissions: &mut dyn NodePermissions,

@@ -580,12 +580,12 @@ fn op_execute_query(
                     let s = String::from_utf8(buffer).unwrap();
 
                     //warn!(s);
-                    return Ok(s);
+                    Ok(s)
                 }
-                _ => return Ok("{\"error\": \"TREX SQL Error\"}".to_string()),
+                _ => Ok("{\"error\": \"TREX SQL Error\"}".to_string()),
             }
         }
-        _ => return Ok("{\"error\": \"TREX SQL Prepare Stmt Error\"}".to_string()),
+        _ => Ok("{\"error\": \"TREX SQL Prepare Stmt Error\"}".to_string()),
     }
 }
 
