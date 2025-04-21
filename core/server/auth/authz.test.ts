@@ -103,19 +103,6 @@ Object.defineProperty(globalThis, "UserMgmtAPI", {
   configurable: true,
 });
 
-// Mock REQUIRED_URL_SCOPES for the test
-const originalRequiredUrlScopes = global.REQUIRED_URL_SCOPES;
-Object.defineProperty(global, "REQUIRED_URL_SCOPES", {
-  value: [
-    {
-      path: "^/trex/plugins/test$",
-      scopes: ["trex"], // This endpoint requires 'trex' scope
-    },
-  ],
-  writable: true,
-  configurable: true,
-});
-
 Deno.test({
   name: "isClientCredToken - should return true for client credentials token",
   fn: () => {
@@ -440,6 +427,63 @@ Deno.test({
   },
 });
 
+// Fixed in issue where all endpoints where 403
+// https://github.com/data2evidence/trex/pull/77
+Deno.test({
+  name: "authz - should allow access when datasetId is not required for specific routes",
+  fn: async () => {
+    const token = createMockToken({
+      userMgmtGroups: {
+        userId: "a6660e40-261e-4782-873e-f76b4328aecf",
+        groups: ["TID=tenant-1;SID=dataset-1;ROLE=RESEARCHER"],
+        alpRoleMap: {
+          ALP_USER_ADMIN: true,
+          ALP_SYSTEM_ADMIN: true,
+          ALP_NIFI_ADMIN: false,
+          ALP_DASHBOARD_VIEWER: false,
+          TENANT_ADMIN: [],
+          TENANT_VIEWER: ["tenant-1"],
+          STUDY_MANAGER: [],
+          STUDY_RESEARCHER: ["dataset-1"],
+        },
+        alp_tenant_id: ["tenant-1"],
+        alp_role_tenant_viewer: ["tenant-1"],
+        alp_role_study_researcher: ["dataset-1"],
+        alp_role_system_admin: true,
+        alp_role_user_admin: true,
+        alp_role_nifi_admin: false,
+        alp_role_dashboard_viewer: false,
+        alp_role_study_admin: [],
+        alp_role_study_mgr: [],
+      },
+    });
+
+    const mockContext = {
+      req: {
+        path: "/usermgmt/api/user-group/overview",
+        header: (name: string) => {
+          return { Authorization: `Bearer ${token}` }[name] || null;
+        },
+        query: (name: string) => undefined,
+        raw: {
+          headers: new Headers({
+            Authorization: `Bearer ${token}`,
+          }),
+        },
+      },
+      get: (name: string) => undefined,
+    } as unknown as Context;
+
+    let nextCalled = false;
+    const next = () => {
+      nextCalled = true;
+    };
+
+    await authz(mockContext, next);
+    assertEquals(nextCalled, true);
+  },
+});
+
 /*** END OF TESTS ***/
 
 // Restore original UserMgmtAPI after tests
@@ -462,20 +506,6 @@ Deno.test({
   fn: () => {
     Object.defineProperty(axios, "post", {
       value: originalAxiosPost,
-      writable: true,
-      configurable: true,
-    });
-  },
-  sanitizeOps: false,
-  sanitizeResources: false,
-});
-
-// Restore original REQUIRED_URL_SCOPES after test
-Deno.test({
-  name: "cleanup",
-  fn: () => {
-    Object.defineProperty(global, "REQUIRED_URL_SCOPES", {
-      value: originalRequiredUrlScopes,
       writable: true,
       configurable: true,
     });
