@@ -520,7 +520,7 @@ impl From<Cell> for Value {
                 Value::Text(s)
             }
             Cell::Bytes(b) => Value::Blob(b),
-            Cell::Array(a) => Value::Null, //a.into(),
+            Cell::Array(_a) => Value::Null, //a.into(),
         }
     }
 }
