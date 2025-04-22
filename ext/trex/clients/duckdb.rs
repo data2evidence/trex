@@ -180,7 +180,7 @@ impl DuckDbClient {
             "create table {}.{}.{} {}",
             &self.current_database, table_name.schema, table_name.name, columns_spec
         );
-        println!("{}", &query);
+        info!("{}", &query);
         self.conn.lock().unwrap().execute(&query, [])?;
         Ok(())
     }
@@ -272,7 +272,7 @@ impl DuckDbClient {
         let _ = c
             .execute(&format!("USE {};", &self.current_database), [])
             .inspect_err(|e| warn!("TREX: Failled to insert row (appender): {e}"));
-        println!("COPY {}", &table_name.name);
+        info!("COPY {}", &table_name.name);
         let mut appender = c.appender_to_db(&table_name.name, &table_name.schema)?;
         for table_row in table_rows {
             let _ = appender
