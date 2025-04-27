@@ -82,7 +82,7 @@ impl DuckDbClient {
             info!("CREATE FTS");
             let q0 = "install fts";
             let c = self.conn.lock().unwrap();
-            let _install_fts = c.execute(&q0, []);
+            let _install_fts = c.execute(q0, []);
             let query = format!(
                 "PRAGMA create_fts_index({}.{}.{}, {}, {})",
                 &self.current_database, table_name.schema, table_name.name, "concept_id", "'*'"

@@ -202,7 +202,7 @@ fn op_copy_tables(
     #[string] db_password: String,
 ) {
     warn!("TREX START TABLE COPY: {duckdb_file}");
-    let command = ReplicateCommand::CopyTable { tables: tables };
+    let command = ReplicateCommand::CopyTable { tables };
     tokio::spawn(async move {
         trex_replicate(
             &TREX_DB,
