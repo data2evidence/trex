@@ -92,7 +92,7 @@ export class DatabaseManager {
 				if (c.vocabSchemas && c.vocabSchemas.length > 0) {
 					console.log(`TREX NO PUB FOUND ${c.id}`)
 					const key = `${c.id}`
-					if(!(key in this.getPublications) {
+					if(!(key in this.getPublications)) {
 						this.#add_postgres(`${key}_pg`, {host: c.host, port: c.port, databaseName: c.name, user: adminCredentials.username, password: adminCredentials.password});
 						const schemas = c.vocabSchemas.map(x => `'${x}'`).join(",");
 						const res = JSON.parse(op_execute_query(`${key}_pg`,`select table_schema as schema,table_name as name from information_schema.tables where table_type = 'BASE TABLE' and table_schema in (${schemas})`, []));
