@@ -29,8 +29,9 @@ impl DuckDbClient {
         file_name: &str,
     ) -> Result<DuckDbClient, duckdb::Error> {
         //let conn = conn;
+        let cache_path = std::env::var("CACHE_FOLDER_PATH").unwrap_or("./data/cache".to_string())
         let _ = conn.lock().unwrap().execute(
-            &format!("ATTACH IF NOT EXISTS './data/cache/{file_name}.db' AS {file_name}"),
+            &format!("ATTACH IF NOT EXISTS '{cache_path}/{file_name}.db' AS {file_name}"),
             [],
         );
         let current_database = file_name.to_string(); //Self::current_database(conn)?;
