@@ -1,6 +1,7 @@
 import { core } from "ext:core/mod.js";
 import { TrexConnection } from './pgconnection.js';
 import { HanaConnection } from './hdbconnection.js';
+import { resolve_cdw_config_duckdb_file_path, DUCKDB_FILE_DATABASE_CODE, DUCKDB_FILE_SCHEMA_NAME } from "./cdw_svc.js"
 
 //import * as hdb from './hdb.js';
 //import * as p from './postgres.js';
@@ -79,6 +80,17 @@ export class DatabaseManager {
 		op_execute_query("memory","LOAD bigquery",[]);
 		op_execute_query("memory",
         `ATTACH IF NOT EXISTS 'project=${credentials.project} dataset=${credentials.dataset}' AS ${name} (TYPE bigquery, READ_ONLY)`, []
+        );
+			}
+
+	add_cdw_config_duckdb_connection() {
+		/*
+		Checks if there is a duckdb file in /usr/src/cdw_data/dynamically_generated, if there is a file there, use it.
+		Else fallback to using the built in duckdb file in /usr/src/cdw_data/built_in
+		*/
+		const duckdb_file_path = resolve_cdw_config_duckdb_file_path()
+		op_execute_query("memory",
+        `ATTACH IF NOT EXISTS '${duckdb_file_path}' AS ${DUCKDB_FILE_SCHEMA_NAME} (READ_ONLY)`, []
         );
     }
 
@@ -176,6 +188,13 @@ export class TrexDB {
 	#database;
 	constructor(database) {
 		const dbm = DatabaseManager.getDatabaseManager();
+
+		if (database === DUCKDB_FILE_DATABASE_CODE) {
+      this.#database = DUCKDB_FILE_DATABASE_CODE;
+			dbm.add_cdw_config_duckdb_connection()
+      return;
+    }
+
 		if(database in dbm.getPublications()) {
 			this.#database = database;
 		} else {
