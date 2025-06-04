@@ -9,8 +9,8 @@ const BUILT_IN_DIR = "/usr/src/cdw_data/built_in";
 
 export const resolve_cdw_config_duckdb_file_path = () => {
   /*
-		Checks if there is a duckdb file in BUILT_IN_DIR, if there is a file there, use it.
-		Else fallback to using the built in duckdb file in DYNAMICALLY_GENERATED_DIR
+		Checks if there is a duckdb file in DYNAMICALLY_GENERATED_DIR, if there is a file there, use it.
+		Else fallback to using the built in duckdb file in BUILT_IN_DIR
 		*/
   const DUCKDB_FILE_NAME = `${DUCKDB_FILE_DATABASE_CODE}_${DUCKDB_FILE_SCHEMA_NAME}`;
   const DYNAMICALLY_GENERATED_DUCKDB_FILE_PATH = `${DYNAMICALLY_GENERATED_DIR}/${DUCKDB_FILE_NAME}`;
