@@ -265,7 +265,7 @@ export class TrexDB {
 			try {
 				//console.log(nparams);
 				console.log(`DB: ${this.#database} ATLAS: ${atlas}`);
-				resolve({sql: op_atlas(this.#database, atlas, [])});
+				resolve({sql: op_atlas(this.#database, atlas)});
 			} catch(e) {
 				reject(e);
 			}

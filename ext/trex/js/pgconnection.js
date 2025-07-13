@@ -79,7 +79,7 @@ export class TrexConnection  {
             callback(null, result);
         } catch (err) {
             console.error(err);
-            callback(new Error(console.error(err), err.message), null);
+            callback(new Error(err.message), null);
         }
     }
 
