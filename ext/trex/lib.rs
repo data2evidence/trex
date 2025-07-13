@@ -670,7 +670,7 @@ fn op_execute_query_stream(
                     match tmp {
                         Ok(tmp2) => {
                             let rows: Vec<RecordBatch> = tmp2.collect();
-                            
+
                             // Stream each row batch as a separate JSON chunk
                             for row in rows {
                                 let buffer = Vec::new();
