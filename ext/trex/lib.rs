@@ -45,12 +45,19 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use tokio::sync::mpsc;
 
+use circe::{
+    build_expression_query, render_and_translate_sql, 
+    validate_cohort_expression, BuildExpressionQueryOptions, init_jvm
+};
+
 use crate::pipeline::{
     batching::{data_pipeline::BatchDataPipeline, BatchConfig},
     sinks::duckdb::DuckDbSink,
     sources::postgres::{PostgresSource, TableNamesFrom},
     PipelineAction,
 };
+
+
 
 static TREX_DB: LazyLock<Arc<Mutex<Connection>>> =
     LazyLock::new(|| Arc::new(Mutex::new(Connection::open_in_memory().unwrap())));
@@ -272,6 +279,7 @@ impl Resource for LlamaStreamResource {
         "LlamaStreamResource".into()
     }
 }
+
 
 #[op2]
 #[serde]
@@ -546,17 +554,21 @@ impl ToSql for TrexType {
     }
 }
 
-#[op2]
-#[string]
-fn op_execute_query(
-    #[string] database: String,
-    #[string] sql: String,
-    #[serde] params: Vec<TrexType>,
+fn execute_query(
+    database: String,
+    sql: String,
+    params: Vec<TrexType>,
 ) -> Result<String, AnyError> {
     let conn = &*TREX_DB.lock().unwrap();
     let _ = conn
         .execute(&format!("USE {database}"), [])
         .inspect_err(|e| warn!("{e}"));
+
+    // Check if the SQL looks valid before attempting to prepare it
+    if sql.trim().is_empty() || !sql.trim_start().to_lowercase().starts_with("select") {
+        warn!("Invalid SQL detected: {}", sql);
+        return Ok(format!("{{\"error\": \"Invalid SQL: {}\"}}", sql.replace("\"", "\\\"")));
+    }
 
     let tmpstmt = conn.prepare(&sql).inspect_err(|e| warn!("{e}"));
 
@@ -628,6 +640,68 @@ fn op_execute_query(
     }
 }
 
+#[op2]
+#[string]
+fn op_execute_query(
+    #[string] database: String,
+    #[string] sql: String,
+    #[serde] params: Vec<TrexType>,
+) -> Result<String, AnyError> {
+    execute_query(database, sql, params)
+}
+
+#[op2]
+#[string]
+fn op_atlas(
+    #[string] database: String,
+    #[string] query: String,
+) -> Result<String, AnyError> {
+    init_jvm()?;
+    warn!("CIRCE input query: {}", query);
+    
+    match validate_cohort_expression(&query) {
+        Ok(validation_result) => {
+            warn!("CIRCE validation result: {}", validation_result);
+            if validation_result.contains("Error") || validation_result.contains("error") {
+                return Ok(format!("{{\"error\": \"Cohort validation failed: {}\"}}", validation_result.replace("\"", "\\\"")));
+            }
+        },
+        Err(e) => {
+            warn!("CIRCE validation error: {}", e);
+            return Ok(format!("{{\"error\": \"Cohort validation error: {}\"}}", e.to_string().replace("\"", "\\\"")));
+        }
+    }
+    
+    let options = BuildExpressionQueryOptions {
+        cohort_id: Some(1),
+        cdm_schema: Some("demo_cdm".to_string()),
+        result_schema: Some("demo_cdm".to_string()),
+        vocabulary_schema: Some("demo_cdm".to_string()),
+        generate_stats: true,
+        ..Default::default()
+    };
+    warn!("CIRCE options: cdm_schema={:?}, result_schema={:?}, vocabulary_schema={:?}", 
+           options.cdm_schema, options.result_schema, options.vocabulary_schema);
+
+    let sql_query = build_expression_query(&query, Some(&options))?;
+    warn!("Generated SQL from CIRCE: {}", sql_query);
+    
+    // Check if CIRCE returned an error message instead of SQL
+    if sql_query.contains("Error building cohort SQL") || sql_query.trim().is_empty() {
+        return Ok(format!("{{\"error\": \"CIRCE failed to generate SQL: {}\"}}", sql_query.replace("\"", "\\\"")));
+    }
+    
+    let translated_sql = render_and_translate_sql(&sql_query, "postgresql")?;
+    warn!("Translated SQL: {}", translated_sql);
+    
+    // Check if translation also failed
+    if translated_sql.contains("Error building cohort SQL") {
+        return Ok(format!("{{\"error\": \"SQL translation failed: {}\"}}", translated_sql.replace("\"", "\\\"")));
+    }
+    Ok(translated_sql)
+    //execute_query(database, translated_sql, vec![])
+}
+
 deno_core::extension!(
     sb_trex,
     ops = [
@@ -635,6 +709,7 @@ deno_core::extension!(
         op_prompt_next,
         op_add_replication,
         op_install_plugin,
+        op_atlas,
         op_execute_query,
         op_exit,
         op_get_dbc,
