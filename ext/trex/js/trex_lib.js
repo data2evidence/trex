@@ -1,6 +1,7 @@
 import { core } from "ext:core/mod.js";
 import { TrexConnection } from './pgconnection.js';
 import { HanaConnection } from './hdbconnection.js';
+import { resolve_cdw_config_duckdb_file_path, DUCKDB_FILE_DATABASE_CODE, DUCKDB_FILE_SCHEMA_NAME } from "./cdw_svc.js"
 
 //import * as hdb from './hdb.js';
 //import * as p from './postgres.js';
@@ -41,6 +42,11 @@ export async function prompt(xprompt, model = null) {
 
 export class DatabaseManager {
 	static #dbm;
+
+	// Information regarding attached cdw-svc duckdb file
+	#attached_cdw_svc_file_path = null;
+	#attached_cdw_svc_file_mtime = null;
+
 	#contructor() {}
 
 	static getDatabaseManager() {
@@ -81,7 +87,37 @@ export class DatabaseManager {
 		op_execute_query("memory",
         `ATTACH IF NOT EXISTS 'project=${credentials.project} dataset=${credentials.dataset}' AS ${name} (TYPE bigquery, READ_ONLY)`, []
         );
+			}
+
+  add_cdw_config_duckdb_connection() {
+    /*
+		Checks if there is a duckdb file in /usr/src/cdw_data/dynamically_generated, if there is a file there, use it.
+		Else fallback to using the built in duckdb file in /usr/src/cdw_data/built_in
+		*/
+    const [duckdb_file_path, file_mtime] =
+      resolve_cdw_config_duckdb_file_path();
+
+    if (
+      this.#attached_cdw_svc_file_path === null || // File not attached yet
+      this.#attached_cdw_svc_file_mtime === null || // File not attached yet
+      duckdb_file_path !== this.#attached_cdw_svc_file_path || // There is a new dynamically created cdw-svc duckdb file
+      file_mtime > this.#attached_cdw_svc_file_mtime // There is a new dynamically created cdw-svc duckdb file
+    ) {
+      op_execute_query(
+        "memory",
+        `DETACH DATABASE IF EXISTS ${DUCKDB_FILE_SCHEMA_NAME}`,
+        []
+      );
+      op_execute_query(
+        "memory",
+        `ATTACH IF NOT EXISTS '${duckdb_file_path}' AS ${DUCKDB_FILE_SCHEMA_NAME} (READ_ONLY)`,
+        []
+      );
     }
+    this.#attached_cdw_svc_file_path = duckdb_file_path;
+    this.#attached_cdw_svc_file_mtime = file_mtime;
+  }
+
 
 	#updatePublications() {
 		for(const c of this.getCredentials()) {
@@ -164,6 +200,10 @@ export class UserDatabaseManager {
 	getDatabaseCredentials() {
 		return this.#dbm.getCredentials();
 	}
+	
+	getFirstPublication(db_id) {
+		return this.#dbm.getFirstPublication(db_id);
+	}
 
 
 	getConnection(db_id, schema, vocab_schema, translationMap) {
@@ -177,6 +217,13 @@ export class TrexDB {
 	#database;
 	constructor(database) {
 		const dbm = DatabaseManager.getDatabaseManager();
+
+		if (database === DUCKDB_FILE_DATABASE_CODE) {
+      this.#database = DUCKDB_FILE_DATABASE_CODE;
+			dbm.add_cdw_config_duckdb_connection()
+      return;
+    }
+
 		if(database in dbm.getPublications()) {
 			this.#database = database;
 		} else {
