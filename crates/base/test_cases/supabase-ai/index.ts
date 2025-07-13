@@ -11,7 +11,10 @@ export default {
         return new Response(
             null,
             {
-                status: embedding instanceof Array ? 200 : 500
+                status: embedding instanceof Array ? 200 : 500,
+                headers: {
+                    'Content-Length': '0'
+                }
             }
         );
     }
