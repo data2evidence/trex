@@ -707,6 +707,7 @@ fn op_atlas(#[string] _database: String, #[string] query: String) -> Result<Stri
     }
     Ok(translated_sql)
     //execute_query(database, translated_sql, vec![])
+}
 
 pub struct QueryStreamResource {
     receiver: Arc<Mutex<mpsc::Receiver<String>>>,
@@ -822,7 +823,6 @@ async fn op_execute_query_stream_next(
             .take::<QueryStreamResource>(rid)?;
     }
     Ok(next_chunk)
-
 }
 
 deno_core::extension!(
