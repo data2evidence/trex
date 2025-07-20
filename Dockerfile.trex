@@ -40,8 +40,6 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,id=${TARGETPLATFORM} \
     mv /usr/src/trex/target/${PROFILE}/trex /root && \
     cp /usr/src/trex/target/${PROFILE}/build/circe-rust-wrapper-*/out/libcirce-native.so /root/ || true && \
     CIRCE_REV=$(grep -A1 'circe.*git.*circe-be' ext/trex/Cargo.toml | grep 'rev' | sed 's/.*rev = "\([^"]*\)".*/\1/' | cut -c1-7) && \
-    echo "CIRCE revision: $CIRCE_REV" && \
-    echo $CIRCE_REV > /root/circe_rev.txt && \
     cp /usr/local/cargo/git/checkouts/circe-be-*/${CIRCE_REV}*/native-libs/linux-x86_64/libcirce-native.so /root/libcirce-native.so || \
     echo "Warning: Could not find CIRCE native library for revision $CIRCE_REV"
 
