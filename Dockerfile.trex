@@ -66,7 +66,6 @@ RUN apt-get remove -y perl && apt-get autoremove -y
 
 COPY --from=builder /root/trex /usr/src/trex
 #COPY --from=builder /root/trex.debug /usr/src/trex.debug
-COPY --from=builder /root/circe_rev.txt /tmp/circe_rev.txt
 COPY --from=builder /root/libcirce-native.so /usr/lib/libcirce-native.so
 
 COPY --from=ort /root/onnxruntime/lib/libonnxruntime.so* /usr/lib/
