@@ -56,6 +56,7 @@ clap = { workspace = true, default-features = true, features = [
 tracing-subscriber = { workspace = true, default-features = true, features = [
     "env-filter",
 ] }
+arrow-pg = { version = "0.*", default-features = false }
 
 [features]
 unknown_types_to_bytes = []
