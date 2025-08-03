@@ -25,11 +25,12 @@ use std::{error::Error, time::Duration};
 use tokio::net::TcpListener;
 use tracing::warn;
 
+/*
 use std::io::Write;
 
 use anyhow::{bail, Context};
 use hf_hub::api::sync::ApiBuilder;
-/*
+
 use llama_cpp_2::context::params::LlamaContextParams;
 use llama_cpp_2::ggml_time_us;
 use llama_cpp_2::llama_backend::LlamaBackend;
@@ -38,11 +39,12 @@ use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::model::{AddBos, Special};
 use llama_cpp_2::sampling::LlamaSampler;
-*/
+
 
 use std::fs;
 use std::num::NonZeroU32;
 use std::pin::pin;
+*/
 
 use deno_core::{OpState, Resource, ResourceId};
 use std::cell::RefCell;
@@ -341,10 +343,10 @@ enum Model {
 }
 
 fn run_llama_model(
-  prompt: String,
-  max_tokens: u32,
-  model: Model,
-  sender: mpsc::Sender<String>,
+  _prompt: String,
+  _max_tokens: u32,
+  _model: Model,
+  _sender: mpsc::Sender<String>,
 ) -> Result<(), anyhow::Error> {
   /*
   let backend = LlamaBackend::init()?;
