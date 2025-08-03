@@ -346,7 +346,7 @@ fn run_llama_model(
   model: Model,
   sender: mpsc::Sender<String>,
 ) -> Result<(), anyhow::Error> {
-  /* 
+  /*
   let backend = LlamaBackend::init()?;
   let model_params = {
     // #[cfg(any(feature = "cuda", feature = "vulkan"))]
