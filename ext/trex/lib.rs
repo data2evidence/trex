@@ -29,6 +29,7 @@ use std::io::Write;
 
 use anyhow::{bail, Context};
 use hf_hub::api::sync::ApiBuilder;
+/*
 use llama_cpp_2::context::params::LlamaContextParams;
 use llama_cpp_2::ggml_time_us;
 use llama_cpp_2::llama_backend::LlamaBackend;
@@ -37,6 +38,7 @@ use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::LlamaModel;
 use llama_cpp_2::model::{AddBos, Special};
 use llama_cpp_2::sampling::LlamaSampler;
+*/
 
 use std::fs;
 use std::num::NonZeroU32;
@@ -344,15 +346,16 @@ fn run_llama_model(
   model: Model,
   sender: mpsc::Sender<String>,
 ) -> Result<(), anyhow::Error> {
+  /* 
   let backend = LlamaBackend::init()?;
   let model_params = {
-    /*#[cfg(any(feature = "cuda", feature = "vulkan"))]
-    if !disable_gpu {
-        LlamaModelParams::default().with_n_gpu_layers(1000)
-    } else {
-        LlamaModelParams::default()
-    }
-    #[cfg(not(any(feature = "cuda", feature = "vulkan")))]*/
+    // #[cfg(any(feature = "cuda", feature = "vulkan"))]
+    // if !disable_gpu {
+    //     LlamaModelParams::default().with_n_gpu_layers(1000)
+    // } else {
+    //     LlamaModelParams::default()
+    // }
+    // #[cfg(not(any(feature = "cuda", feature = "vulkan")))]
     LlamaModelParams::default()
   };
   let ctx_size: Option<NonZeroU32> = Some(NonZeroU32::new(max_tokens).unwrap());
@@ -361,10 +364,10 @@ fn run_llama_model(
 
   let model_params = pin!(model_params);
 
-  /*for (k, v) in &key_value_overrides {
-      let k = CString::new(k.as_bytes()).with_context(|| format!("invalid key: {k}"))?;
-      model_params.as_mut().append_kv_override(k.as_c_str(), *v);
-  }*/
+  // for (k, v) in &key_value_overrides {
+  //     let k = CString::new(k.as_bytes()).with_context(|| format!("invalid key: {k}"))?;
+  //     model_params.as_mut().append_kv_override(k.as_c_str(), *v);
+  // }
 
   let model_path: String = match model {
     Model::Local { path } => path,
@@ -514,6 +517,7 @@ fn run_llama_model(
   );
 
   println!("{}", ctx.timings());
+  */
   Ok(())
 }
 
