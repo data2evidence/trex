@@ -35,6 +35,8 @@ WORKDIR /usr/src/trex
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=${TARGETPLATFORM} \
     --mount=type=cache,target=/usr/src/trex/target,id=${TARGETPLATFORM} \
     #(cargo build --profile ${PROFILE} --workspace || true) && \
+    GRAALVM_NATIVE_IMAGE_OPTIONS="-H:StackSize=128m" \
+    JAVA_TOOL_OPTIONS="-Xss128m" \
     GIT_V_TAG=${GIT_V_VERSION} cargo build --profile ${PROFILE} --features "${FEATURES}" && \
     #cargo strip && \
     mv /usr/src/trex/target/${PROFILE}/trex /root && \
@@ -75,5 +77,20 @@ COPY deno.json /usr/src
 
 RUN npm install
 
-CMD ["npm", "run", "start"]
+
+RUN echo '* soft stack unlimited' >> /etc/security/limits.conf && \
+    echo '* hard stack unlimited' >> /etc/security/limits.conf && \
+    echo '* soft nofile 65536' >> /etc/security/limits.conf && \
+    echo '* hard nofile 65536' >> /etc/security/limits.conf
+
+ENV RUST_MIN_STACK=134217728
+ENV V8_FLAGS="--stack-size=131072"
+ENV MALLOC_ARENA_MAX=2
+ENV MALLOC_MMAP_THRESHOLD_=131072
+
+ENV GRAALVM_NATIVE_IMAGE_OPTIONS="-H:StackSize=128m"
+ENV JAVA_TOOL_OPTIONS="-Xss128m"
+ENV SVM_OPTIONS="-XX:MaxDirectMemorySize=2g -XX:+UnlockExperimentalVMOptions"
+
+CMD ["npm run start"]
 EXPOSE 33000

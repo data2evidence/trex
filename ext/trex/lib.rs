@@ -678,65 +678,90 @@ fn op_atlas(
   init_jvm()?;
   warn!("CIRCE input query: {}", query);
 
-  match validate_cohort_expression(&query) {
-    Ok(validation_result) => {
-      warn!("CIRCE validation result: {}", validation_result);
-      if validation_result.contains("Error")
-        || validation_result.contains("error")
-      {
-        return Ok(format!(
-          "{{\"error\": \"Cohort validation failed: {}\"}}",
-          validation_result.replace("\"", "\\\"")
-        ));
+  let result = std::thread::Builder::new()
+    .stack_size(32 * 1024 * 1024)
+    .spawn(move || -> Result<String, AnyError> {
+      match validate_cohort_expression(&query) {
+        Ok(validation_result) => {
+          warn!("CIRCE validation result: {}", validation_result);
+          if validation_result.contains("Error")
+            || validation_result.contains("error")
+          {
+            return Ok(format!(
+              "{{\"error\": \"Cohort validation failed: {}\"}}",
+              validation_result.replace("\"", "\\\"")
+            ));
+          }
+        }
+        Err(e) => {
+          warn!("CIRCE validation error: {}", e);
+          return Ok(format!(
+            "{{\"error\": \"Cohort validation error: {}\"}}",
+            e.to_string().replace("\"", "\\\"")
+          ));
+        }
       }
-    }
-    Err(e) => {
-      warn!("CIRCE validation error: {}", e);
-      return Ok(format!(
-        "{{\"error\": \"Cohort validation error: {}\"}}",
-        e.to_string().replace("\"", "\\\"")
-      ));
-    }
-  }
 
-  let options = BuildExpressionQueryOptions {
-    cohort_id: Some(1),
-    cdm_schema: Some("demo_cdm".to_string()),
-    result_schema: Some("demo_cdm".to_string()),
-    vocabulary_schema: Some("demo_cdm".to_string()),
-    generate_stats: true,
-    ..Default::default()
-  };
-  warn!(
+      let options = BuildExpressionQueryOptions {
+        cohort_id: Some(1),
+        cdm_schema: Some("demo_cdm".to_string()),
+        result_schema: Some("demo_cdm".to_string()),
+        vocabulary_schema: Some("demo_cdm".to_string()),
+        generate_stats: true,
+        ..Default::default()
+      };
+      warn!(
         "CIRCE options: cdm_schema={:?}, result_schema={:?}, vocabulary_schema={:?}",
         options.cdm_schema, options.result_schema, options.vocabulary_schema
-    );
+      );
 
-  let sql_query = build_expression_query(&query, Some(&options))?;
-  warn!("Generated SQL from CIRCE: {}", sql_query);
+      let sql_query = build_expression_query(&query, Some(&options))?;
+      warn!("Generated SQL from CIRCE: {}", sql_query);
 
-  // Check if CIRCE returned an error message instead of SQL
-  if sql_query.contains("Error building cohort SQL")
-    || sql_query.trim().is_empty()
-  {
-    return Ok(format!(
-      "{{\"error\": \"CIRCE failed to generate SQL: {}\"}}",
-      sql_query.replace("\"", "\\\"")
-    ));
+      // Check if CIRCE returned an error message instead of SQL
+      if sql_query.contains("Error building cohort SQL")
+        || sql_query.trim().is_empty()
+      {
+        return Ok(format!(
+          "{{\"error\": \"CIRCE failed to generate SQL: {}\"}}",
+          sql_query.replace("\"", "\\\"")
+        ));
+      }
+
+      let translated_sql = render_and_translate_sql(&sql_query, "postgresql")?;
+      warn!("Translated SQL: {}", translated_sql);
+
+      // Check if translation also failed
+      if translated_sql.contains("Error building cohort SQL") {
+        return Ok(format!(
+          "{{\"error\": \"SQL translation failed: {}\"}}",
+          translated_sql.replace("\"", "\\\"")
+        ));
+      }
+      Ok(translated_sql)
+    })
+    .map_err(|e| {
+      warn!("Failed to spawn CIRCE thread: {}", e);
+      deno_core::anyhow::anyhow!("Failed to create thread for CIRCE operations: {}", e)
+    })?;
+
+  match result.join() {
+    Ok(circe_result) => circe_result,
+    Err(panic_payload) => {
+      let panic_msg = if let Some(s) = panic_payload.downcast_ref::<String>() {
+        s.clone()
+      } else if let Some(s) = panic_payload.downcast_ref::<&str>() {
+        s.to_string()
+      } else {
+        "Unknown panic in CIRCE thread".to_string()
+      };
+      warn!("CIRCE thread panicked: {}", panic_msg);
+      Ok(format!(
+        "{{\"error\": \"CIRCE operation failed: {}\"}}",
+        panic_msg.replace("\"", "\\\"")
+      ))
+    }
   }
-
-  let translated_sql = render_and_translate_sql(&sql_query, "postgresql")?;
-  warn!("Translated SQL: {}", translated_sql);
-
-  // Check if translation also failed
-  if translated_sql.contains("Error building cohort SQL") {
-    return Ok(format!(
-      "{{\"error\": \"SQL translation failed: {}\"}}",
-      translated_sql.replace("\"", "\\\"")
-    ));
-  }
-  Ok(translated_sql)
-  //execute_query(database, translated_sql, vec![])
 }
 
 pub struct QueryStreamResource {
