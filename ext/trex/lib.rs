@@ -7,15 +7,17 @@ use std::process;
 use conversions::table::TableName;
 use deno_core::error::AnyError;
 use deno_core::op2;
+use duckdb::arrow::array::{
+  Array, BooleanArray, Float64Array, Int64Array, StringArray,
+};
+use duckdb::arrow::datatypes::DataType; // removed TimeUnit (unused)
+use duckdb::arrow::record_batch::RecordBatch;
 use duckdb::{
   params_from_iter, types::ToSqlOutput, types::Value, Connection, ToSql,
 };
-use duckdb::arrow::record_batch::RecordBatch;
-use duckdb::arrow::array::{Array, StringArray, Int64Array, Float64Array, BooleanArray};
-use duckdb::arrow::datatypes::DataType; // removed TimeUnit (unused)
 use pgwire::tokio::process_socket;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value as JsonValue, Map as JsonMap};
+use serde_json::{Map as JsonMap, Value as JsonValue};
 pub use sql::{
   auth::AuthType,
   duckdb::{TrexDuckDB, TrexDuckDBFactory},
@@ -574,8 +576,14 @@ impl ToSql for TrexType {
   }
 }
 
-fn field_value_to_json(array: &dyn Array, row: usize, dt: &DataType) -> JsonValue {
-  if array.is_null(row) { return JsonValue::Null; }
+fn field_value_to_json(
+  array: &dyn Array,
+  row: usize,
+  dt: &DataType,
+) -> JsonValue {
+  if array.is_null(row) {
+    return JsonValue::Null;
+  }
   match dt {
     DataType::Utf8 => {
       let arr = array.as_any().downcast_ref::<StringArray>().unwrap();
@@ -626,8 +634,12 @@ fn execute_query(
   params: Vec<TrexType>,
 ) -> Result<String, AnyError> {
   let conn = &*TREX_DB.lock().unwrap();
-  let _ = conn.execute(&format!("USE {database}"), []).inspect_err(|e| warn!("{e}"));
-  if sql.trim().is_empty() { return Ok("[]".to_string()); }
+  let _ = conn
+    .execute(&format!("USE {database}"), [])
+    .inspect_err(|e| warn!("{e}"));
+  if sql.trim().is_empty() {
+    return Ok("[]".to_string());
+  }
   let tmpstmt = conn.prepare(&sql).inspect_err(|e| warn!("{e}"));
   match tmpstmt {
     Ok(mut stmt) => match stmt.query_arrow(params_from_iter(params.iter())) {
@@ -635,9 +647,9 @@ fn execute_query(
         let batches: Vec<RecordBatch> = iter.collect();
         Ok(record_batches_to_json(&batches))
       }
-      Err(_) => Ok("[]".to_string())
+      Err(_) => Ok("[]".to_string()),
     },
-    Err(_) => Ok("[]".to_string())
+    Err(_) => Ok("[]".to_string()),
   }
 }
 
@@ -745,18 +757,25 @@ fn op_execute_query_stream(
   tokio::spawn(async move {
     tokio::task::spawn_blocking(move || {
       let conn = &*TREX_DB.lock().unwrap();
-      if conn.execute(&format!("USE {database}"), []).is_err() { return; }
+      if conn.execute(&format!("USE {database}"), []).is_err() {
+        return;
+      }
       if let Ok(mut stmt) = conn.prepare(&sql) {
         if let Ok(iter) = stmt.query_arrow(params_from_iter(params.iter())) {
-          for batch in iter { // each item is a RecordBatch
+          for batch in iter {
+            // each item is a RecordBatch
             let json = record_batches_to_json(std::slice::from_ref(&batch));
-            if sender.blocking_send(json).is_err() { break; }
+            if sender.blocking_send(json).is_err() {
+              break;
+            }
           }
         }
       }
     });
   });
-  let resource = QueryStreamResource { receiver: Arc::new(Mutex::new(receiver)) };
+  let resource = QueryStreamResource {
+    receiver: Arc::new(Mutex::new(receiver)),
+  };
   Ok(state.resource_table.add(resource))
 }
 
