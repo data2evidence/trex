@@ -136,7 +136,17 @@ export class DatabaseManager {
 		op_execute_query("memory",
         `ATTACH IF NOT EXISTS 'project=${credentials.project} dataset=${credentials.dataset}' AS ${name} (TYPE bigquery, READ_ONLY)`, []
         );
-			}
+	}
+
+	#add_duckdb(
+		name
+    ) {
+		op_execute_query("memory",
+        `ATTACH IF NOT EXISTS './data/cache/{name}.db' AS {name}`, []
+        );
+	}
+
+
 
     add_cdw_config_duckdb_connection() {
     /*
@@ -200,14 +210,16 @@ export class DatabaseManager {
 				console.log(`TREX ADD BQ ${c.id}`)
 				const key = `${c.id}`
 				if(!(key in this.getPublications)) {
-					this.#add_bigquery(`${key}`, {project: c.host, dataset: c.name});
+					this.#add_bigquery(`${key}_srcdb`, {project: c.host, dataset: c.name});
 					const pub = this.getPublications();
 					pub[key] = true;
 					this.#setPublications(pub);
 				}
 			} else {
 				console.log(`TREX DB NOT SUPPORTED ${c.id}`)
+				continue;
 			}
+			this.#add_duckdb(`${c.id}`);
 		}
 	}
 
