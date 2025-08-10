@@ -11,6 +11,7 @@ ARG FEATURES=cli/tracing
 ENV ZERO_AR_DATE=1
 ENV DUCKDB_STATIC_BUILD=1
 ENV LLAMA_CUBLAS=1
+ENV duckdb_version=1.3.2
 
 RUN echo "Platform: $TARGETPLATFORM"
 
@@ -57,6 +58,7 @@ RUN objcopy --strip-debug \
 FROM builder as ort
 RUN ./scripts/install_onnx.sh $ONNXRUNTIME_VERSION linux $TARGETPLATFORM /root/onnxruntime
 
+FROM ghcr.io/p-hoffmann/duckdb-extension-circe:sha-265ca31 AS duckdb_circe
 
 FROM node:18.20.4-bookworm-slim AS trex-base
 RUN apt-get update && apt-get install -y curl libssl-dev libgomp1 libopenblas-dev && rm -rf /var/lib/apt/lists/*
@@ -67,6 +69,12 @@ COPY --from=builder /root/trex /usr/src/trex
 COPY --from=builder /root/libcirce-native.so /usr/lib/libcirce-native.so
 
 COPY --from=ort /root/onnxruntime/lib/libonnxruntime.so* /usr/lib/
+
+RUN mkdir -p /root/.duckdb/extensions/v${duckdb_version}/linux_amd64
+COPY --from=duckdb_circe /extension/circe.duckdb_extension /root/.duckdb/extensions/v${duckdb_version}/linux_amd64/circe.duckdb_extension
+
+#ENV DUCKDB_EXTENSION_DIR=/usr/lib/duckdb/extensions \
+#    DUCKDB_CIRCE_EXTENSION=/usr/lib/duckdb/extensions/circe/circe.duckdb_extension
 
 WORKDIR /usr/src
 
