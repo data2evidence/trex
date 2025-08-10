@@ -325,13 +325,24 @@ export class TrexDB {
 			}
 		});
 	}
-	atlas_query(atlas) {
+	atlas_query(atlas, cdmSchema, cohortId) {
 
 		return new Promise((resolve, reject) => {
 			try {
-				//console.log(nparams);
-				console.log(`DB: ${this.#database} ATLAS: ${atlas}`);
-				resolve({sql: op_atlas(this.#database, atlas)});
+				const atlasStr = (typeof atlas === 'string') ? atlas : JSON.stringify(atlas);
+				const toBase64 = (s) => {
+					if (typeof Buffer !== 'undefined' && Buffer.from) {
+						return Buffer.from(s, 'utf8').toString('base64');
+					}
+					const bytes = new TextEncoder().encode(s);
+					let binary = '';
+					for (const b of bytes) binary += String.fromCharCode(b);
+					return btoa(binary);
+				};
+				const atlasB64 = toBase64(atlasStr);
+				let query = `select circe_json_to_sql(${atlasB64} , '{"cdmSchema":"${cdmSchema}","resultSchema": "${cdmSchema}","targetTable":"cohort","cohortId":"${cohortId}","generateStats":true}')`;
+				resolve({sql: op_execute_query(this.#database, query, [])});
+
 			} catch(e) {
 				reject(e);
 			}
