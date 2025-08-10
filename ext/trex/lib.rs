@@ -10,7 +10,6 @@ use deno_core::op2;
 use duckdb::{
   params_from_iter, types::ToSqlOutput, types::Value, Connection, ToSql,
 };
-// Removed external arrow_* crates; use DuckDB's bundled Arrow re-exports only
 use duckdb::arrow::record_batch::RecordBatch;
 use duckdb::arrow::array::{Array, StringArray, Int64Array, Float64Array, BooleanArray};
 use duckdb::arrow::datatypes::DataType; // removed TimeUnit (unused)
@@ -575,9 +574,6 @@ impl ToSql for TrexType {
   }
 }
 
-// BEGIN ARROW IPC HELPERS (REMOVED IN REVERT)
-// (Removed duplicate imports below)
-// Reverting to JSON serialization helpers using DuckDB Arrow types
 fn field_value_to_json(array: &dyn Array, row: usize, dt: &DataType) -> JsonValue {
   if array.is_null(row) { return JsonValue::Null; }
   match dt {
@@ -623,7 +619,6 @@ fn record_batches_to_json(batches: &[RecordBatch]) -> String {
   }
   serde_json::to_string(&rows).unwrap_or_else(|_| "[]".to_string())
 }
-// END JSON HELPERS
 
 fn execute_query(
   database: String,
