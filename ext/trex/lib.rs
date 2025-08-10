@@ -13,7 +13,7 @@ use duckdb::arrow::array::{
 use duckdb::arrow::datatypes::DataType; // removed TimeUnit (unused)
 use duckdb::arrow::record_batch::RecordBatch;
 use duckdb::{
-  params_from_iter, types::ToSqlOutput, types::Value, Connection, ToSql,
+  params_from_iter, types::ToSqlOutput, types::Value, Connection, Config, ToSql,
 };
 use pgwire::tokio::process_socket;
 use serde::{Deserialize, Serialize};
@@ -70,9 +70,26 @@ use crate::pipeline::{
   PipelineAction,
 };
 
-static TREX_DB: LazyLock<Arc<Mutex<Connection>>> =
-  LazyLock::new(|| Arc::new(Mutex::new(Connection::open_in_memory().unwrap())));
-
+static TREX_DB: LazyLock<Arc<Mutex<Connection>>> = LazyLock::new(|| {
+    let cfg = match Config::default().allow_unsigned_extensions() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Failed to allow unsigned extensions: {e}");
+            Config::default()
+        }
+    };
+    let conn = Connection::open_in_memory_with_flags(cfg)
+        .expect("Failed to open DuckDB in-memory with config");
+    if let Ok(path) = std::env::var("DUCKDB_CIRCE_EXTENSION") {
+        let escaped = path.replace('\'', "''");
+        if let Err(e) = conn.execute(&format!("LOAD '{}'", escaped), []) {
+            eprintln!("Failed to LOAD extension from {}: {e}", path);
+        }
+    } else {
+        let _ = conn.execute("LOAD circe", []);
+    }
+    Arc::new(Mutex::new(conn))
+});
 static DB_CREDENTIALS: LazyLock<Arc<Mutex<String>>> = LazyLock::new(|| {
   Arc::new(Mutex::new(String::from(
     "{\"credentials\":[], \"publications\":{}}",

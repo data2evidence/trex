@@ -142,7 +142,7 @@ export class DatabaseManager {
 		name
     ) {
 		op_execute_query("memory",
-        `ATTACH IF NOT EXISTS './data/cache/{name}.db' AS {name}`, []
+        `ATTACH IF NOT EXISTS './data/cache/${name}.db' AS ${name}`, []
         );
 	}
 
