@@ -667,7 +667,7 @@ fn op_execute_query(
 #[string]
 fn op_atlas(
   #[string] _database: String,
-  #[string] query: String,
+  #[string] _query: String,
 ) -> Result<String, AnyError> {
   /*init_jvm()?;
   warn!("CIRCE input query: {}", query);
