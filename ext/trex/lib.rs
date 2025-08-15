@@ -4,16 +4,18 @@ pub mod pipeline;
 pub mod sql;
 use std::process;
 
+use base64;
 use conversions::table::TableName;
 use deno_core::error::AnyError;
 use deno_core::op2;
 use duckdb::arrow::array::{
-  Array, BooleanArray, Float64Array, Int64Array, StringArray,
-  Int32Array, Int16Array, Int8Array, UInt64Array, UInt32Array, UInt16Array, UInt8Array,
-  Float32Array, Date32Array, Date64Array, Time32SecondArray, Time32MillisecondArray,
-  Time64MicrosecondArray, Time64NanosecondArray, TimestampSecondArray,
-  TimestampMillisecondArray, TimestampMicrosecondArray, TimestampNanosecondArray,
-  Decimal128Array, BinaryArray, LargeBinaryArray, LargeStringArray,
+  Array, BinaryArray, BooleanArray, Date32Array, Date64Array, Decimal128Array,
+  Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
+  LargeBinaryArray, LargeStringArray, StringArray, Time32MillisecondArray,
+  Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray,
+  TimestampMicrosecondArray, TimestampMillisecondArray,
+  TimestampNanosecondArray, TimestampSecondArray, UInt16Array, UInt32Array,
+  UInt64Array, UInt8Array,
 };
 use duckdb::arrow::datatypes::{DataType, TimeUnit};
 use duckdb::arrow::record_batch::RecordBatch;
@@ -23,7 +25,6 @@ use duckdb::{
 use pgwire::tokio::process_socket;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map as JsonMap, Value as JsonValue};
-use base64;
 pub use sql::{
   auth::AuthType,
   duckdb::{TrexDuckDB, TrexDuckDBFactory},
@@ -683,23 +684,38 @@ fn field_value_to_json(
       JsonValue::from(arr.value(row))
     }
     DataType::Time64(_) => {
-      let arr = array.as_any().downcast_ref::<Time64MicrosecondArray>().unwrap();
+      let arr = array
+        .as_any()
+        .downcast_ref::<Time64MicrosecondArray>()
+        .unwrap();
       JsonValue::from(arr.value(row))
     }
     DataType::Timestamp(TimeUnit::Second, _) => {
-      let arr = array.as_any().downcast_ref::<TimestampSecondArray>().unwrap();
+      let arr = array
+        .as_any()
+        .downcast_ref::<TimestampSecondArray>()
+        .unwrap();
       JsonValue::from(arr.value(row))
     }
     DataType::Timestamp(TimeUnit::Millisecond, _) => {
-      let arr = array.as_any().downcast_ref::<TimestampMillisecondArray>().unwrap();
+      let arr = array
+        .as_any()
+        .downcast_ref::<TimestampMillisecondArray>()
+        .unwrap();
       JsonValue::from(arr.value(row))
     }
     DataType::Timestamp(TimeUnit::Microsecond, _) => {
-      let arr = array.as_any().downcast_ref::<TimestampMicrosecondArray>().unwrap();
+      let arr = array
+        .as_any()
+        .downcast_ref::<TimestampMicrosecondArray>()
+        .unwrap();
       JsonValue::from(arr.value(row))
     }
     DataType::Timestamp(TimeUnit::Nanosecond, _) => {
-      let arr = array.as_any().downcast_ref::<TimestampNanosecondArray>().unwrap();
+      let arr = array
+        .as_any()
+        .downcast_ref::<TimestampNanosecondArray>()
+        .unwrap();
       JsonValue::from(arr.value(row))
     }
     DataType::Decimal128(_, scale) => {
