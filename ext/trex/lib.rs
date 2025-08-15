@@ -4,16 +4,15 @@ pub mod pipeline;
 pub mod sql;
 use std::process;
 
-use base64;
+use base64::{engine::general_purpose, Engine as _};
 use conversions::table::TableName;
 use deno_core::error::AnyError;
 use deno_core::op2;
 use duckdb::arrow::array::{
   Array, BinaryArray, BooleanArray, Date32Array, Date64Array, Decimal128Array,
   Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
-  LargeBinaryArray, LargeStringArray, StringArray, Time32MillisecondArray,
-  Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray,
-  TimestampMicrosecondArray, TimestampMillisecondArray,
+  LargeBinaryArray, LargeStringArray, StringArray, Time32SecondArray,
+  Time64MicrosecondArray, TimestampMicrosecondArray, TimestampMillisecondArray,
   TimestampNanosecondArray, TimestampSecondArray, UInt16Array, UInt32Array,
   UInt64Array, UInt8Array,
 };
@@ -620,12 +619,12 @@ fn field_value_to_json(
     DataType::Binary => {
       let arr = array.as_any().downcast_ref::<BinaryArray>().unwrap();
       let bytes = arr.value(row);
-      JsonValue::String(base64::encode(bytes))
+      JsonValue::String(general_purpose::STANDARD.encode(bytes))
     }
     DataType::LargeBinary => {
       let arr = array.as_any().downcast_ref::<LargeBinaryArray>().unwrap();
       let bytes = arr.value(row);
-      JsonValue::String(base64::encode(bytes))
+      JsonValue::String(general_purpose::STANDARD.encode(bytes))
     }
     DataType::Int8 => {
       let arr = array.as_any().downcast_ref::<Int8Array>().unwrap();
