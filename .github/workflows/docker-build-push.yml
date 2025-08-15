@@ -8,7 +8,8 @@ on:
         required: false
         type: choice
         options:
-          - data2evidence/trex
+          - ohdsi/trex
+          - data2evidence/trex 
       GIT_BRANCH_NAME:
         default: develop
         description: Enter BranchName / ReleaseTagName
