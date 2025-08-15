@@ -724,10 +724,6 @@ fn field_value_to_json(
       let decimal_value = value as f64 / 10_f64.powi(*scale as i32);
       JsonValue::from(decimal_value)
     }
-    DataType::Timestamp(_, _) => {
-      let arr = array.as_any().downcast_ref::<Int64Array>().unwrap();
-      JsonValue::from(arr.value(row))
-    }
     _ => JsonValue::Null,
   }
 }
